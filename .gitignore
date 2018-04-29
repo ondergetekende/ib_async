@@ -1,0 +1,7 @@
+.*
+
+/.pytest_cache/
+/*.egg-info/
+__pycache__
+/.tox/
+/coverage_html/
