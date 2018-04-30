@@ -5,7 +5,7 @@ import typing
 import pytest
 
 import ib_async.errors
-from ib_async.protocol import IncomingMessage, Protocol, RequestId
+from ib_async.protocol import IncomingMessage, Protocol, RequestId, Serializable
 from ib_async.messages import Incoming, Outgoing
 from ib_async.protocol_versions import ProtocolVersion
 
@@ -53,7 +53,16 @@ def test_message_read():
 
     assert mk_message_read(IntEnum, "2") == IntEnum.T2
 
-    class UnknownClass():
+    class SerializableClass(Serializable):
+        def serialize(self, protocol_version: ProtocolVersion):
+            pass
+
+        def deserialize(self, message: IncomingMessage):
+            self.vals = message.read(int), message.read(str)
+
+    assert mk_message_read(SerializableClass, "42", 'foo').vals == (42, 'foo')
+
+    class UnknownClass:
         pass
 
     with pytest.raises(ValueError):
@@ -112,7 +121,16 @@ def test_protocol_serialize():
     assert prot.serialize(ProtocolVersion(112)) == b'112'
     assert prot.serialize(None) == b''
 
-    class UnknownClass():
+    class SerializableClass(Serializable):
+        def deserialize(self, message: IncomingMessage):
+            pass
+
+        def serialize(self, protocol_version: ProtocolVersion):
+            return [42, "foo"]
+
+    assert prot.serialize(SerializableClass()) == b'42\x00foo'
+
+    class UnknownClass:
         pass
 
     with pytest.raises(ValueError):
@@ -192,7 +210,6 @@ def test_protocol_check_dispatch(caplog):
     assert caplog.records == []
 
     with caplog.at_level('DEBUG'):
-
         del protocol._handle_tick_size
         protocol.dispatch_message(["2", "10", "42"])
         assert len(caplog.records) == 1

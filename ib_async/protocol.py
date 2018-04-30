@@ -16,7 +16,8 @@ RequestId = typing.NewType('RequestId', int)
 SerializableField = typing.Union[str, float, int, RequestId,
                                  typing.Dict[str, str],
                                  typing.List[str], bool,
-                                 enum.Enum, None]
+                                 enum.Enum, None,
+                                 "Serializable"]
 
 T = typing.TypeVar('T')
 TK = typing.TypeVar('TK')
@@ -62,7 +63,7 @@ class IncomingMessage:
              min_message_version: int = None, max_message_version: int = None,
              default: typing.Optional[T] = None
              ) -> T:  # type: ignore
-        """Consome one or more network-representation fields, and turn it into the provided python type."""
+        """Consume one or more network-representation fields, and turn it into the provided python type."""
 
         # Apply message version restrictions
         if min_version and min_version > self.protocol_version:
@@ -77,6 +78,11 @@ class IncomingMessage:
         if max_message_version and max_message_version <= self.message_version:
             return default
 
+        if inspect.isclass(the_type) and issubclass(the_type, Serializable):
+            result = the_type()
+            result.deserialize(self)
+            return result
+
         # Start reading a field
         text = self.fields[self.idx]
         self.idx += 1
@@ -84,7 +90,7 @@ class IncomingMessage:
         if the_type == RequestId:
             return RequestId(int(text))  # type: ignore
 
-        if issubclass(the_type, str):
+        if inspect.isclass(the_type) and issubclass(the_type, str):
             return the_type(text)  # type: ignore
 
         if not text:
@@ -127,6 +133,18 @@ class IncomingMessage:
             return [self.read(value_type) for _ in range(int(text))]  # type: ignore
 
         raise ValueError('unsupported type')
+
+
+class Serializable(abc.ABC):
+    @abc.abstractmethod
+    def serialize(self, protocol_version: ProtocolVersion) -> typing.Iterable[SerializableField]:
+        """Return serializable fields in network-order"""
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def deserialize(self, message: IncomingMessage):
+        """Read this object from a network-message"""
+        raise NotImplementedError()
 
 
 class ProtocolInterface(abc.ABC):
@@ -178,6 +196,9 @@ class Protocol(ProtocolInterface):
         """Take a single field, and turn it into the appropriate network representation"""
         if isinstance(field, enum.Enum):
             field = field.value  # Enums are sent as their underlying type
+
+        if isinstance(field, Serializable):
+            return b"\0".join(self.serialize(sub_field) for sub_field in field.serialize(self.version))
 
         if field is None:
             return b""
