@@ -12,15 +12,10 @@ class FunctionalityTestHelper(ib_async.protocol.ProtocolInterface):
 
         self.next_id = ib_async.protocol.RequestId(42)
         self.futures = {}
-        self.sent = []
+        self.sent = []  # type: typing.List[bytes]
 
-    def send_message(self, message_id: ib_async.protocol.Outgoing,
-                     *fields: ib_async.protocol.SerializableField):
-        """Send a message to IB."""
-        msg = []  # type: typing.List[typing.Any]
-        msg.append(message_id)
-        msg.extend(fields)
-        self.sent.append(msg)
+    def send(self, message: ib_async.protocol.OutgoingMessage):
+        self.sent.append(message.serialize())
 
     def check_feature(self, min_version: ib_async.protocol.ProtocolVersion, feature: str):
         """Checks if we're using a minimal protocol level, and raisess an exception otherwise."""
@@ -45,3 +40,7 @@ class FunctionalityTestHelper(ib_async.protocol.ProtocolInterface):
                    getattr(self, "_handle_%s_v%i" % (msg_name, message.message_version), None))
 
         message.invoke_handler(handler)
+
+    def assert_message_sent(self, *arguments):
+        msg = ib_async.protocol.OutgoingMessage(*arguments)
+        assert msg.serialize() in self.sent

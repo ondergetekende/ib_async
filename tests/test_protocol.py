@@ -5,7 +5,7 @@ import typing
 import pytest
 
 import ib_async.errors
-from ib_async.protocol import IncomingMessage, Protocol, RequestId, Serializable
+from ib_async.protocol import IncomingMessage, Protocol, RequestId, Serializable, OutgoingMessage
 from ib_async.messages import Incoming, Outgoing
 from ib_async.protocol_versions import ProtocolVersion
 
@@ -109,17 +109,17 @@ def test_message_versioned():
     assert msg.read(str, max_version=ProtocolVersion(112)) is None
 
 
-def test_protocol_serialize():
-    prot = Protocol()
-    assert prot.serialize("") == b''
-    assert prot.serialize(1) == b'1'
-    assert prot.serialize(1.01) == b'1.01'
-    assert prot.serialize(True) == b'1'
-    assert prot.serialize(False) == b'0'
-    assert prot.serialize([""]) == b'1\0'
-    assert prot.serialize({'a': 1}) == b'1\0a\x001'
-    assert prot.serialize(ProtocolVersion(112)) == b'112'
-    assert prot.serialize(None) == b''
+def test_outgoing_serialize():
+    msg = OutgoingMessage(Outgoing.REQ_HISTORICAL_TICKS)
+    assert msg._serialize_field("") == b''
+    assert msg._serialize_field(1) == b'1'
+    assert msg._serialize_field(1.01) == b'1.01'
+    assert msg._serialize_field(True) == b'1'
+    assert msg._serialize_field(False) == b'0'
+    assert msg._serialize_field([""]) == b'1\0'
+    assert msg._serialize_field({'a': 1}) == b'1\0a\x001'
+    assert msg._serialize_field(ProtocolVersion(112)) == b'112'
+    assert msg._serialize_field(None) == b''
 
     class SerializableClass(Serializable):
         def deserialize(self, message: IncomingMessage):
@@ -128,13 +128,13 @@ def test_protocol_serialize():
         def serialize(self, protocol_version: ProtocolVersion):
             return [42, "foo"]
 
-    assert prot.serialize(SerializableClass()) == b'42\x00foo'
+    assert msg._serialize_field(SerializableClass()) == b'42\x00foo'
 
     class UnknownClass:
         pass
 
     with pytest.raises(ValueError):
-        prot.serialize(UnknownClass())
+        msg._serialize_field(UnknownClass())
 
 
 def test_protocol_futures():

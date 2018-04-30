@@ -81,7 +81,7 @@ class IncomingMessage:
         if inspect.isclass(the_type) and issubclass(the_type, Serializable):
             result = the_type()
             result.deserialize(self)
-            return result
+            return result  # type: ignore
 
         # Start reading a field
         text = self.fields[self.idx]
@@ -135,6 +135,70 @@ class IncomingMessage:
         raise ValueError('unsupported type')
 
 
+class OutgoingMessage:
+    def __init__(self, message_type: Outgoing, *fields,
+                 version: int = None, request_id: RequestId = None,
+                 protocol_version: ProtocolVersion = None) -> None:
+        self.fields = [message_type]  # type: typing.List[SerializableField]
+        self.fields.extend(fields)
+        self.protocol_version = protocol_version
+
+        if version is not None:
+            self.fields.append(version)
+
+        if request_id is not None:
+            self.fields.append(request_id)
+
+    def add(self, *fields: SerializableField,
+            min_version: ProtocolVersion = None,
+            max_version: ProtocolVersion = None):
+        if min_version and self.protocol_version < min_version:
+            pass
+        elif max_version and self.protocol_version >= max_version:
+            pass
+        else:
+            self.fields.extend(fields)
+
+    def _serialize_field(self, field: SerializableField) -> bytes:
+        """Take a single field, and turn it into the appropriate network representation"""
+        if isinstance(field, enum.Enum):
+            field = field.value  # Enums are sent as their underlying type
+
+        if isinstance(field, Serializable):
+            return b"\0".join(self._serialize_field(sub_field)
+                              for sub_field in field.serialize(self.protocol_version))
+
+        if field is None:
+            return b""
+
+        if isinstance(field, str):  # bool type is encoded as int
+            return field.encode()
+
+        if isinstance(field, bool):  # bool type is encoded as int
+            return b"1" if field else b'0'
+
+        if isinstance(field, (float, int)):
+            return str(field).encode()
+
+        if isinstance(field, dict):
+            vals = [self._serialize_field(len(field))]
+            for key, value in field.items():
+                vals.extend([self._serialize_field(key), self._serialize_field(value)])
+            return b"\0".join(vals)
+
+        if isinstance(field, list):
+            vals = [self._serialize_field(len(field))]
+            vals.extend(self._serialize_field(value) for value in field)
+            return b"\0".join(vals)
+
+        raise ValueError('unsupported type')
+
+    def serialize(self) -> bytes:
+        encoded_message = b"\x00".join(self._serialize_field(field) for field in self.fields) + b'\x00'
+        LOG.debug("sending %s (%s)", self.fields[0], encoded_message.split(b'\x00')[1:])
+        return struct.pack("!I", len(encoded_message)) + encoded_message
+
+
 class Serializable(abc.ABC):
     @abc.abstractmethod
     def serialize(self, protocol_version: ProtocolVersion) -> typing.Iterable[SerializableField]:
@@ -152,9 +216,12 @@ class ProtocolInterface(abc.ABC):
         super().__init__()
         self.version = None  # type: ProtocolVersion
 
-    @abc.abstractmethod
     def send_message(self, message_id: Outgoing, *fields: SerializableField):
-        """Send a message to IB."""
+        self.send(OutgoingMessage(message_id, *fields))
+
+    @abc.abstractmethod
+    def send(self, message: OutgoingMessage):
+        """Send a prebuilt message to IB."""
         pass
 
     @abc.abstractmethod
@@ -191,39 +258,6 @@ class Protocol(ProtocolInterface):
         result = self.next_request_id
         self.next_request_id += 1
         return result
-
-    def serialize(self, field: SerializableField) -> bytes:
-        """Take a single field, and turn it into the appropriate network representation"""
-        if isinstance(field, enum.Enum):
-            field = field.value  # Enums are sent as their underlying type
-
-        if isinstance(field, Serializable):
-            return b"\0".join(self.serialize(sub_field) for sub_field in field.serialize(self.version))
-
-        if field is None:
-            return b""
-
-        if isinstance(field, str):  # bool type is encoded as int
-            return field.encode()
-
-        if isinstance(field, bool):  # bool type is encoded as int
-            return b"1" if field else b'0'
-
-        if isinstance(field, (float, int)):
-            return str(field).encode()
-
-        if isinstance(field, dict):
-            vals = [self.serialize(len(field))]
-            for key, value in field.items():
-                vals.extend([self.serialize(key), self.serialize(value)])
-            return b"\0".join(vals)
-
-        if isinstance(field, list):
-            vals = [self.serialize(len(field))]
-            vals.extend(self.serialize(value) for value in field)
-            return b"\0".join(vals)
-
-        raise ValueError('unsupported type')
 
     async def connect(self, hostname: str, port: int, client_id=None):
         """Establish a connection to the TWS/IBGW server."""
@@ -304,13 +338,8 @@ class Protocol(ProtocolInterface):
         else:
             LOG.debug('no handler for %s v%i', message.message_type, message.message_version)
 
-    def send_message(self, message_id: Outgoing, *fields: SerializableField):
-        encoded_fields = b"\0".join(self.serialize(field) for field in fields)
-        message = b'%i\0%b\0' % (message_id.value, encoded_fields)
-
-        LOG.debug("sending %s (%s)", message_id, encoded_fields)
-        to_send = struct.pack("!I", len(message)) + message
-        self.writer.write(to_send)
+    def send(self, message: OutgoingMessage):
+        self.writer.write(message.serialize())
 
     def check_feature(self, min_version: ProtocolVersion, feature: str = None):
         if not self.version:
