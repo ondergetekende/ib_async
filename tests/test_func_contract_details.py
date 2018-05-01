@@ -57,7 +57,7 @@ def test_update_details():
     t = MixinFixture()
     t.version = 110
 
-    instrument = Instrument()
+    instrument = Instrument(t)
     instrument.symbol = 'AAPL'
     instrument.security_ids = {SecurityIdentifierType.ISIN: 'US0378331005'}
 

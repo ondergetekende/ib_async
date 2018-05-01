@@ -6,11 +6,12 @@ import logging
 import struct
 import typing
 
-from ib_async.errors import OutdatedServerError, NotConnectedError, ApiException
+from ib_async.errors import OutdatedServerError, NotConnectedError, ApiException, warning_codes
 from ib_async.messages import Outgoing, Incoming, messages_with_version
 from ib_async.protocol_versions import ProtocolVersion
 
 LOG = logging.getLogger(__name__)
+LOG_MESSAGES = LOG.getChild('messages')
 
 RequestId = typing.NewType('RequestId', int)
 SerializableField = typing.Union[str, float, int, RequestId,
@@ -25,8 +26,9 @@ TV = typing.TypeVar('TV')
 
 
 class IncomingMessage:
-    def __init__(self, fields: typing.List[str], protocol_version: ProtocolVersion) -> None:
-        self.fields = fields
+    def __init__(self, fields: typing.Iterable[str], protocol_version: ProtocolVersion) -> None:
+        self.fields = list(fields)
+        self.field_parsed = typing.cast(typing.List[SerializableField], fields)
         self.idx = 0
         self.protocol_version = protocol_version
         self.message_version = 0
@@ -46,6 +48,10 @@ class IncomingMessage:
         call_data = []  # type: typing.List[typing.Any]
 
         for parameter in signature.parameters.values():
+            if parameter.kind == 2:
+                call_data.extend(self.fields[self.idx:])
+                break
+
             assert parameter.kind in (0, 1)
             if parameter.annotation == IncomingMessage:
                 call_data.append(self)
@@ -61,9 +67,7 @@ class IncomingMessage:
     def read(self, the_type: typing.Type[T], *,
              min_version: ProtocolVersion = None, max_version: ProtocolVersion = None,
              min_message_version: int = None, max_message_version: int = None,
-             default: typing.Optional[T] = None
-             ) -> T:  # type: ignore
-        """Consume one or more network-representation fields, and turn it into the provided python type."""
+             default: typing.Optional[T] = None):
 
         # Apply message version restrictions
         if min_version and min_version > self.protocol_version:
@@ -77,6 +81,14 @@ class IncomingMessage:
 
         if max_message_version and max_message_version <= self.message_version:
             return default
+
+        idx = self.idx
+        result = self._read_inner(the_type)
+        self.field_parsed[idx] = result  # type:ignore
+        return result
+
+    def _read_inner(self, the_type: typing.Type[T]) -> T:  # type: ignore
+        """Consume one or more network-representation fields, and turn it into the provided python type."""
 
         if inspect.isclass(the_type) and issubclass(the_type, Serializable):
             result = the_type()
@@ -105,7 +117,12 @@ class IncomingMessage:
             try:
                 return the_type(text)  # type: ignore
             except ValueError:
+                pass
+            try:
                 return the_type(int(text))  # type: ignore
+            except ValueError:
+                pass
+            return text  # type: ignore
 
         if issubclass(the_type, int):
             return the_type(text)  # type: ignore
@@ -123,22 +140,28 @@ class IncomingMessage:
             key_type, value_type = the_type.__args__  # type: ignore
 
             # We can't go straight to a dict comprehension, as that would mess up the order
-            pairs = [(self.read(key_type), self.read(value_type))
-                     for _ in range(int(text))]
+            pairs = [(self._read_inner(key_type), self._read_inner(value_type))
+                     for _ in range(int(text))]  # type: ignore
             return dict(pairs)  # type: ignore
 
         if issubclass(the_type, typing.List):
             value_type, = the_type.__args__  # type: ignore
             # IB only supports str/str dicts, stored as a KVP array
-            return [self.read(value_type) for _ in range(int(text))]  # type: ignore
+            return [self._read_inner(value_type) for _ in range(int(text))]  # type: ignore
 
         raise ValueError('unsupported type')
+
+    def __repr__(self):
+        return "IncomingMessage(%s, %s, protocol_version=%s)" % (
+            self.field_parsed[0], ", ".join(repr(f) for f in self.field_parsed[1:]),
+            self.protocol_version)
 
 
 class OutgoingMessage:
     def __init__(self, message_type: Outgoing, *fields,
                  version: int = None, request_id: RequestId = None,
                  protocol_version: ProtocolVersion = None) -> None:
+        message_type = Outgoing(message_type)
         self.fields = [message_type]  # type: typing.List[SerializableField]
         self.fields.extend(fields)
         self.protocol_version = protocol_version
@@ -195,8 +218,10 @@ class OutgoingMessage:
 
     def serialize(self) -> bytes:
         encoded_message = b"\x00".join(self._serialize_field(field) for field in self.fields) + b'\x00'
-        LOG.debug("sending %s (%s)", self.fields[0], encoded_message.split(b'\x00')[1:])
         return struct.pack("!I", len(encoded_message)) + encoded_message
+
+    def __repr__(self):
+        return "OutgoingMessage(%s, %s)" % (self.fields[0], ", ".join(repr(f) for f in self.fields[1:]))
 
 
 class Serializable(abc.ABC):
@@ -278,7 +303,7 @@ class Protocol(ProtocolInterface):
         # Negotiate a version
         versions = b"v%d..%d" % (ProtocolVersion.MIN_CLIENT, ProtocolVersion.MAX_CLIENT)
         to_send = b'API\0' + struct.pack("!I", len(versions)) + versions
-        LOG.debug("SENDING %r", to_send)
+        LOG_MESSAGES.debug("SENDING %r", to_send)
         self.writer.write(to_send)
 
         # Wait for the negotiation response. Apparently it is also possible to receive other messages before the
@@ -334,11 +359,15 @@ class Protocol(ProtocolInterface):
                            None))
 
         if handler:
-            message.invoke_handler(handler)
+            try:
+                message.invoke_handler(handler)
+            finally:
+                LOG_MESSAGES.debug('received %r', message)
         else:
-            LOG.debug('no handler for %s v%i', message.message_type, message.message_version)
+            LOG.debug('no handler for %r (v%i)', message, message.message_version)
 
     def send(self, message: OutgoingMessage):
+        LOG_MESSAGES.debug('send %r', message)
         self.writer.write(message.serialize())
 
     def check_feature(self, min_version: ProtocolVersion, feature: str = None):
@@ -363,8 +392,11 @@ class Protocol(ProtocolInterface):
     # ---- Generic handlers ----
 
     def _handle_err_msg(self, request_id: RequestId, error_code: int, error_message: str):
-        future = self._pending_responses.pop(request_id, None)
-        if future:
-            future.set_exception(ApiException(error_code, error_message))
+        if error_code in warning_codes:
+            LOG.info("Received warning#%i from TWS: %s", error_code, error_message)
         else:
-            LOG.warning("Received error#%i from TWS: %s", error_code, error_message)
+            future = self._pending_responses.pop(request_id, None)
+            if future:
+                future.set_exception(ApiException(error_code, error_message))
+            else:
+                LOG.warning("Received error#%i from TWS: %s", error_code, error_message)

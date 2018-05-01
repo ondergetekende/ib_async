@@ -213,7 +213,8 @@ def test_protocol_check_dispatch(caplog):
         del protocol._handle_tick_size
         protocol.dispatch_message(["2", "10", "42"])
         assert len(caplog.records) == 1
-        assert caplog.records[0].message == 'no handler for Incoming.TICK_SIZE v10'
+        assert caplog.records[0].message == ("no handler for IncomingMessage(Incoming.TICK_SIZE, 10, "
+                                             "'42', protocol_version=None) (v10)")
 
 
 def test_protocol_check_dispatch_versioned():

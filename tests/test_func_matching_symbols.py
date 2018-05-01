@@ -1,3 +1,4 @@
+import typing
 
 from ib_async.functionality.matching_symbols import MatchingSymbolsMixin
 from ib_async.instrument import Instrument, SecurityType
@@ -30,7 +31,7 @@ def test_single_one_result():
     assert fut.done()
     assert len(fut.result()) == 1
 
-    instrument: Instrument = fut.result()[0]
+    instrument = typing.cast(Instrument, fut.result()[0])
     assert instrument.contract_id == 42
     assert instrument.symbol == 'AAPL'
     assert instrument.security_type == SecurityType.Stock

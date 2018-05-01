@@ -94,7 +94,7 @@ class ContractDetailsMixin(ProtocolInterface):
     def _handle_contract_data(self, request_id: RequestId, message: IncomingMessage):
         contract = self._pending_contract_updates.get(request_id)
         if not contract:
-            contract = self._pending_contract_updates[request_id] = Instrument()
+            contract = self._pending_contract_updates[request_id] = Instrument(self)
 
         contract.symbol = message.read(str)
         contract.security_type = message.read(SecurityType)
@@ -132,7 +132,6 @@ class ContractDetailsMixin(ProtocolInterface):
         contract.aggregated_group = message.read(str, min_version=ProtocolVersion.AGG_GROUP)
 
         contract.underlying_symbol = message.read(str, min_version=ProtocolVersion.UNDERLYING_INFO)
-
         contract.underlying_security_type = message.read(SecurityType)
 
         contract.market_rule_ids = message.read(str, min_version=ProtocolVersion.MARKET_RULES)

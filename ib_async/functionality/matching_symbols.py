@@ -14,7 +14,7 @@ class MatchingSymbolsMixin(ProtocolInterface):
     def _handle_symbol_samples(self, request_id: RequestId, num_contracts: int, message: IncomingMessage):
         result = []
         for _ in range(num_contracts):
-            contract = Instrument()
+            contract = Instrument(self)
 
             contract.contract_id = message.read(int)
             contract.symbol = message.read(str)
