@@ -387,7 +387,8 @@ class Protocol(ProtocolInterface):
 
     def resolve_future(self, request_id: RequestId, result):
         future = self._pending_responses.pop(request_id, None)
-        future.set_result(result)
+        if future:
+            future.set_result(result)
 
     # ---- Generic handlers ----
 

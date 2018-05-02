@@ -1,4 +1,3 @@
-import asyncio
 import typing
 
 import ib_async.protocol
@@ -11,23 +10,13 @@ class FunctionalityTestHelper(ib_async.protocol.Protocol):
     def __init__(self):
         super().__init__()
 
-        self.next_id = ib_async.protocol.RequestId(42)
+        self.next_request_id = ib_async.protocol.RequestId(43)
         self.version = ib_async.protocol.ProtocolVersion(110)
         self.futures = {}
         self.sent = []  # type: typing.List[bytes]
 
     def send(self, message: ib_async.protocol.OutgoingMessage):
         self.sent.append(message.serialize()[4:])
-
-    def make_future(self) -> typing.Tuple[ib_async.protocol.RequestId, asyncio.Future]:
-        """Generates a unique request id and associated future"""
-        self.next_id += 1
-        self.futures[self.next_id] = asyncio.Future()
-        return self.next_id, self.futures[self.next_id]
-
-    def resolve_future(self, request_id: ib_async.protocol.RequestId, result):
-        """Resolves a future identified by a request id"""
-        self.futures[request_id].set_result(result)
 
     def fake_incoming(self, *fields):
         # use a fake outgoing message to serialize the arguments

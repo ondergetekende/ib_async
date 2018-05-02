@@ -53,6 +53,7 @@ class Instrument:
     def __init__(self, parent: protocol.ProtocolInterface) -> None:
         self._parent = parent
         self._market_data_request_id = None  # type: protocol.RequestId
+        self._realtime_bars_request_id = None  # type: protocol.RequestId
         self.market_data_timeliness = tick_types.MarketDataTimeliness.RealTime
         self._tick_data = {}  # type: typing.Dict[tick_types.TickType, typing.Any]
         self._tick_attributes = {}  # type: typing.Dict[tick_types.TickType, tick_types.TickAttributes]
@@ -108,13 +109,13 @@ class Instrument:
         if attributes is not None:
             self._tick_attributes[tick_type] = attributes
 
-    def fetch_market_data(self, tick_types: typing.Iterable[tick_types.TickTypeGroup]=()):
+    def fetch_market_data(self, tick_types: typing.Iterable[tick_types.TickTypeGroup] = ()):
         """Retrieve a single snaphot of market data for this contract."""
         from .functionality.market_data import MarketDataMixin
         parent = typing.cast(MarketDataMixin, self._parent)
         return parent.get_market_data(self, tick_types, snapshot=True, regulatory_snapshot=False)
 
-    def subscribe_market_data(self, tick_types: typing.Iterable[tick_types.TickTypeGroup]=()):
+    def subscribe_market_data(self, tick_types: typing.Iterable[tick_types.TickTypeGroup] = ()):
         """Subscribe to market data for this contract."""
         from .functionality.market_data import MarketDataMixin
         parent = typing.cast(MarketDataMixin, self._parent)
@@ -125,3 +126,17 @@ class Instrument:
             from .functionality.market_data import MarketDataMixin
             parent = typing.cast(MarketDataMixin, self._parent)
             parent.cancel_market_data(self)
+
+    def subscribe_realtime_bars(self):
+        from .functionality.realtime_bars import RealtimeBarsMixin
+        parent = typing.cast(RealtimeBarsMixin, self._parent)
+        parent.subscribe_realtime_bars(self)
+
+    def unsubscribe_realtime_bars(self):
+        from .functionality.realtime_bars import RealtimeBarsMixin
+        parent = typing.cast(RealtimeBarsMixin, self._parent)
+        parent.unsubscribe_realtime_bars(self)
+
+    def handle_realtime_bar(self, time: int, open: float, high: float, low: float, close: float,
+                            volume: int, average: float, count: int):
+        pass
