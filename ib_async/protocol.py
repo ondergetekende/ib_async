@@ -38,7 +38,8 @@ class IncomingMessage:
     def reset(self):
         self.idx = 0
         self.message_type = self.read(Incoming)
-        if self.message_type in messages_with_version:
+
+        if self.protocol_version < messages_with_version.get(self.message_type, 0):
             self.message_version = self.read(int)
         else:
             self.message_version = 0
@@ -387,7 +388,7 @@ class Protocol(ProtocolInterface):
 
     def resolve_future(self, request_id: RequestId, result):
         future = self._pending_responses.pop(request_id, None)
-        if future:
+        if future and not future.done():
             future.set_result(result)
 
     # ---- Generic handlers ----

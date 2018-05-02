@@ -23,21 +23,8 @@ class ContractDetailsMixin(ProtocolInterface):
             security_id_type = security_id = None
 
         self.send_message(Outgoing.REQ_CONTRACT_DATA, 8, request_id,
-                          instrument.contract_id,
-                          instrument.symbol,
-                          instrument.security_type,
-                          instrument.last_trade_date or instrument.contract_month,
-                          instrument.strike,
-                          instrument.right,
-                          instrument.multiplier,
-                          instrument.exchange,
-                          instrument.primary_exchange,
-                          instrument.currency,
-                          instrument.local_symbol,
-                          instrument.trading_class,
-                          include_expired,
-                          security_id_type,
-                          security_id)
+                          instrument,
+                          include_expired, security_id_type, security_id)
         self._pending_contract_updates[request_id] = instrument
 
         return future

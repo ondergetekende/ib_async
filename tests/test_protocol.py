@@ -203,6 +203,7 @@ def test_protocol_check_dispatch(caplog):
         is_called_arg = arg
 
     protocol._handle_tick_size = mocked
+    protocol.version = ProtocolVersion.MIN_CLIENT
     protocol.dispatch_message(["2", "10", "42"])
 
     assert is_called_arg == 42
@@ -214,7 +215,7 @@ def test_protocol_check_dispatch(caplog):
         protocol.dispatch_message(["2", "10", "42"])
         assert len(caplog.records) == 1
         assert caplog.records[0].message == ("no handler for IncomingMessage(Incoming.TICK_SIZE, 10, "
-                                             "'42', protocol_version=None) (v10)")
+                                             "'42', protocol_version=ProtocolVersion.MIN_CLIENT) (v10)")
 
 
 def test_protocol_check_dispatch_versioned():
@@ -225,6 +226,7 @@ def test_protocol_check_dispatch_versioned():
         nonlocal is_called_arg
         is_called_arg = arg
 
+    protocol.version = ProtocolVersion.MIN_CLIENT
     protocol._handle_tick_size_v10 = mocked
     protocol.dispatch_message(["2", "10", "42"])
 

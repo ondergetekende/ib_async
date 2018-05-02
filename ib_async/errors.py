@@ -49,7 +49,7 @@ class ConnectionFailed(SocketException):
            "of version 954.1 or newer:  TWS: 7497; IB Gateway: 4002")
 
 
-class UnsupportedFeature(Exception):
+class UnsupportedFeature(NotImplementedError):
     def __init__(self, feature):
         super().__init__("ib_async does not yet support %s. Please contact the author if you need this implemented." %
                          feature)

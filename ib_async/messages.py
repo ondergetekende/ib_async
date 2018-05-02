@@ -1,5 +1,7 @@
 import enum
 
+from ib_async.protocol_versions import ProtocolVersion
+
 
 class Outgoing(enum.IntEnum):
     REQ_MKT_DATA = 1
@@ -155,22 +157,31 @@ class Incoming(enum.IntEnum):
     TICK_BY_TICK = 99
 
 
-messages_with_version = {
-    Incoming.TICK_SIZE, Incoming.ERR_MSG, Incoming.ACCT_VALUE, Incoming.NEXT_VALID_ID, Incoming.MARKET_DEPTH,
-    Incoming.MARKET_DEPTH_L2, Incoming.NEWS_BULLETINS, Incoming.MANAGED_ACCTS, Incoming.RECEIVE_FA,
-    Incoming.SCANNER_PARAMETERS, Incoming.TICK_GENERIC, Incoming.TICK_STRING, Incoming.TICK_EFP, Incoming.CURRENT_TIME,
-    Incoming.FUNDAMENTAL_DATA, Incoming.CONTRACT_DATA_END, Incoming.OPEN_ORDER_END, Incoming.ACCT_DOWNLOAD_END,
-    Incoming.EXECUTION_DATA_END, Incoming.TICK_SNAPSHOT_END, Incoming.MARKET_DATA_TYPE, Incoming.POSITION_END,
-    Incoming.ACCOUNT_SUMMARY, Incoming.ACCOUNT_SUMMARY_END, Incoming.VERIFY_MESSAGE_API, Incoming.VERIFY_COMPLETED,
-    Incoming.DISPLAY_GROUP_LIST, Incoming.DISPLAY_GROUP_UPDATED, Incoming.VERIFY_AND_AUTH_MESSAGE_API,
-    Incoming.VERIFY_AND_AUTH_COMPLETED, Incoming.POSITION_MULTI_END, Incoming.ACCOUNT_UPDATE_MULTI,
-    Incoming.ACCOUNT_UPDATE_MULTI_END, Incoming.TICK_PRICE, Incoming.OPEN_ORDER, Incoming.PORTFOLIO_VALUE,
-    Incoming.CONTRACT_DATA, Incoming.BOND_CONTRACT_DATA, Incoming.SCANNER_DATA, Incoming.REAL_TIME_BARS,
-    Incoming.TICK_OPTION_COMPUTATION, Incoming.DELTA_NEUTRAL_VALIDATION, Incoming.COMMISSION_REPORT,
-    Incoming.POSITION_DATA, Incoming.POSITION_MULTI, Incoming.ACCT_UPDATE_TIME,
+# IB seems to be phasing out per-message versions in favor of connection-wide protocol versions. Several messages
+# seem to have dropped their individual version. `messages_with_versions` is a lookup_table showing the first protocol
+# version not having the versioned message. Messages that never were versioned, have 0 as their first protocol
+messages_with_version = {msg_id: 0 for msg_id in Incoming}
 
-    # Dependent on protocol version
-    # IncomingMessage.EXECUTION_DATA ,# ver < ServerVersion.LAST_LIQUIDITY (Extra check, more complicated)
-    # IncomingMessage.HISTORICAL_DATA ,# ver < ServerVersion.SYNT_REALTIME_BARS:
-    # IncomingMessage.ORDER_STATUS,  # ver >= ServerVersion.MARKET_CAP_PRICE
-}
+# Set the messages to one beyond the max protocol for messages that are always versioned
+messages_with_version.update(
+    (msg_id, int(ProtocolVersion.MAX_CLIENT) + 1)
+    for msg_id in (Incoming.TICK_SIZE, Incoming.ERR_MSG, Incoming.ACCT_VALUE, Incoming.NEXT_VALID_ID,
+                   Incoming.MARKET_DEPTH, Incoming.MARKET_DEPTH_L2, Incoming.NEWS_BULLETINS, Incoming.MANAGED_ACCTS,
+                   Incoming.RECEIVE_FA, Incoming.SCANNER_PARAMETERS, Incoming.TICK_GENERIC, Incoming.TICK_STRING,
+                   Incoming.TICK_EFP, Incoming.CURRENT_TIME, Incoming.FUNDAMENTAL_DATA, Incoming.CONTRACT_DATA_END,
+                   Incoming.OPEN_ORDER_END, Incoming.ACCT_DOWNLOAD_END, Incoming.EXECUTION_DATA_END,
+                   Incoming.TICK_SNAPSHOT_END, Incoming.MARKET_DATA_TYPE, Incoming.POSITION_END,
+                   Incoming.ACCOUNT_SUMMARY, Incoming.ACCOUNT_SUMMARY_END, Incoming.VERIFY_MESSAGE_API,
+                   Incoming.VERIFY_COMPLETED, Incoming.DISPLAY_GROUP_LIST, Incoming.DISPLAY_GROUP_UPDATED,
+                   Incoming.VERIFY_AND_AUTH_MESSAGE_API, Incoming.VERIFY_AND_AUTH_COMPLETED,
+                   Incoming.POSITION_MULTI_END, Incoming.ACCOUNT_UPDATE_MULTI, Incoming.ACCOUNT_UPDATE_MULTI_END,
+                   Incoming.TICK_PRICE, Incoming.OPEN_ORDER, Incoming.PORTFOLIO_VALUE, Incoming.CONTRACT_DATA,
+                   Incoming.BOND_CONTRACT_DATA, Incoming.SCANNER_DATA, Incoming.REAL_TIME_BARS,
+                   Incoming.TICK_OPTION_COMPUTATION, Incoming.DELTA_NEUTRAL_VALIDATION, Incoming.COMMISSION_REPORT,
+                   Incoming.POSITION_DATA, Incoming.POSITION_MULTI, Incoming.ACCT_UPDATE_TIME)
+)
+
+# Add the known final versioned versions
+messages_with_version[Incoming.EXECUTION_DATA] = ProtocolVersion.LAST_LIQUIDITY
+messages_with_version[Incoming.HISTORICAL_DATA] = ProtocolVersion.SYNT_REALTIME_BARS
+messages_with_version[Incoming.ORDER_STATUS] = ProtocolVersion.MARKET_CAP_PRICE

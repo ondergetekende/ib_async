@@ -3,6 +3,7 @@ import logging
 import typing
 
 from ib_async import protocol, tick_types
+from ib_async.bar import Bar, BarType
 
 LOG = logging.getLogger(__name__)
 
@@ -21,8 +22,10 @@ class SecurityType(str, enum.Enum):
     UNSPECIFIED = ''
 
     Stock = 'STK'
+    Cash = 'CASH'
     Future = 'FUT'
     Index = 'IND'
+    Bag = 'BAG'
 
 
 class SecurityIdentifierType(str, enum.Enum):
@@ -49,11 +52,12 @@ class UnderlyingComponent(protocol.Serializable):
         self.price = message.read(float)
 
 
-class Instrument:
+class Instrument(protocol.Serializable):
     def __init__(self, parent: protocol.ProtocolInterface) -> None:
         self._parent = parent
         self._market_data_request_id = None  # type: protocol.RequestId
         self._realtime_bars_request_id = None  # type: protocol.RequestId
+        self._historical_data_request_id = None  # type: protocol.RequestId
         self.market_data_timeliness = tick_types.MarketDataTimeliness.RealTime
         self._tick_data = {}  # type: typing.Dict[tick_types.TickType, typing.Any]
         self._tick_attributes = {}  # type: typing.Dict[tick_types.TickType, tick_types.TickAttributes]
@@ -94,6 +98,25 @@ class Instrument:
         self.market_rule_ids = ""
         self.real_expiration_date = ""
         self.underlying_component = None  # type: UnderlyingComponent
+
+    def serialize(self, protocol_version):
+        # This is the most common (but not the only) way to serialize instruments.
+        yield self.contract_id
+        yield self.symbol
+        yield self.security_type
+        yield self.last_trade_date or self.contract_month
+        yield self.strike
+        yield self.right
+        yield self.multiplier
+        yield self.exchange
+        yield self.primary_exchange
+        yield self.currency
+        yield self.local_symbol
+        yield self.trading_class
+
+    def deserialize(self, message: protocol.IncomingMessage):
+        # There are several ways a contract is deserialized. I have yet to determine the most common one.
+        raise NotImplementedError()
 
     def tick(self, tick_type: tick_types.TickType, value: typing.Any, size: float = None,
              attributes: tick_types.TickAttributes = None):
@@ -137,6 +160,11 @@ class Instrument:
         parent = typing.cast(RealtimeBarsMixin, self._parent)
         parent.unsubscribe_realtime_bars(self)
 
-    def handle_realtime_bar(self, time: int, open: float, high: float, low: float, close: float,
-                            volume: int, average: float, count: int):
+    def handle_realtime_bar(self, bar: Bar):
         pass
+
+    def get_historic_bars(self, end_date, duration, bar_size,
+                          what_to_show=BarType.Midpoint) -> typing.Awaitable[typing.List[Bar]]:
+        from .functionality.realtime_bars import RealtimeBarsMixin
+        parent = typing.cast(RealtimeBarsMixin, self._parent)
+        return parent.get_historical_bars(self, end_date, duration, bar_size=bar_size, what_to_show=what_to_show)
