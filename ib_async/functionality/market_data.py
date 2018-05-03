@@ -14,7 +14,7 @@ LOG = logging.getLogger(__name__)
 class MarketDataMixin(ProtocolInterface):
     def __init__(self):
         super().__init__()
-        self._instruments = {}
+        self.__instruments = {}
 
     def change_market_data_timeliness(self, timeliness: MarketDataTimeliness):
         """Switches market data timeliness.
@@ -26,14 +26,14 @@ class MarketDataMixin(ProtocolInterface):
         self.send_message(Outgoing.REQ_MARKET_DATA_TYPE, 1, timeliness)
 
     def _handle_market_data_type(self, request_id: RequestId, timeliness: MarketDataTimeliness):
-        instrument = self._instruments[request_id]
+        instrument = self.__instruments[request_id]
         instrument.market_data_timeliness = timeliness
 
     def get_market_data(self, instrument: Instrument,
                         tick_types: typing.Iterable[TickTypeGroup] = (),
                         snapshot=False, regulatory_snapshot=False,
-                        market_data_options: typing.Dict[str, str] = None
-                        ) -> typing.Awaitable[Instrument]:
+                        market_data_options: typing.Dict[str, str] = None) -> typing.Awaitable[None]:
+
         if instrument._market_data_request_id:
             raise ValueError('instrument has already been subscribed for market')
 
@@ -43,20 +43,7 @@ class MarketDataMixin(ProtocolInterface):
         request_id, future = self.make_future()
         message = OutgoingMessage(Outgoing.REQ_MKT_DATA, version=11, request_id=request_id,
                                   protocol_version=self.version)
-
-        message.add(
-            instrument.contract_id,
-            instrument.symbol,
-            instrument.security_type,
-            instrument.contract_month or instrument.last_trade_date,
-            instrument.strike,
-            instrument.right,
-            instrument.multiplier,  # srv v15 and above
-            instrument.exchange,
-            instrument.primary_exchange,  # srv v14 and above
-            instrument.currency,
-            instrument.local_symbol,  # srv v2 and above
-            instrument.trading_class)
+        message.add(instrument)
 
         if instrument.security_type == 'BAG':
             raise UnsupportedFeature("BAG orders")  # We're currently missing serialization for BAG
@@ -78,7 +65,7 @@ class MarketDataMixin(ProtocolInterface):
 
         self.send(message)
 
-        self._instruments[request_id] = instrument
+        self.__instruments[request_id] = instrument
 
         if not snapshot:
             instrument._market_data_request_id = request_id
@@ -95,29 +82,29 @@ class MarketDataMixin(ProtocolInterface):
 
     def _handle_tick_price(self, request_id: RequestId, tick_type: TickType, price: float, size: float,
                            attributes: int):
-        instrument = self._instruments[request_id]
+        instrument = self.__instruments[request_id]
         instrument.tick(tick_type, price, size, TickAttributes.list_from_int(attributes))
 
     def _handle_tick_generic(self, request_id: RequestId, tick_type: TickType, value: float):
-        instrument = self._instruments[request_id]
+        instrument = self.__instruments[request_id]
         instrument.tick(tick_type, value)
 
     def _handle_tick_size(self, request_id: RequestId, tick_type: TickType, value: int):
-        instrument = self._instruments[request_id]
+        instrument = self.__instruments[request_id]
         instrument.tick(tick_type, value)
 
     def _handle_tick_string(self, request_id: RequestId, tick_type: TickType, value: str):
-        instrument = self._instruments[request_id]
+        instrument = self.__instruments[request_id]
         instrument.tick(tick_type, value)
 
     def _handle_tick_req_params(self, request_id: RequestId, min_tick: float, bbo_exchange: str,
                                 snapshot_permissions: int):
-        instrument = self._instruments[request_id]
+        instrument = self.__instruments[request_id]
 
         instrument.minimum_tick = min_tick
         instrument.bbo_exchange = bbo_exchange
         instrument.snapshot_permissions = snapshot_permissions
 
     def _handle_tick_snapshot_end(self, request_id: RequestId):
-        instrument = self._instruments.pop(request_id)
+        instrument = self.__instruments.pop(request_id)
         self.resolve_future(request_id, instrument)

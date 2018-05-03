@@ -4,6 +4,8 @@ import typing
 
 from ib_async import protocol, tick_types
 from ib_async.bar import Bar, BarType
+from ib_async.event import Event
+
 
 LOG = logging.getLogger(__name__)
 
@@ -128,22 +130,32 @@ class Instrument(protocol.Serializable):
         # There are several ways a contract is deserialized. I have yet to determine the most common one.
         raise NotImplementedError()
 
+    on_tick = Event()  # type: Event[tick_types.TickType]
+
     def tick(self, tick_type: tick_types.TickType, value: typing.Any, size: float = None,
              attributes: tick_types.TickAttributes = None):
 
+        size_tick_type = None
         if size is not None:
             try:
-                self._tick_data[_tick_type_size_lookup[tick_type]] = size
+                size_tick_type =  _tick_type_size_lookup[tick_type]
             except KeyError:
                 if size:
                     LOG.warning('received tick %s with size, but have no way to store it')
+            else:
+                self._tick_data[size_tick_type] = size
 
         self._tick_data[tick_type] = value
         if attributes is not None:
             self._tick_attributes[tick_type] = attributes
 
-    def fetch_market_data(self, tick_types: typing.Iterable[tick_types.TickTypeGroup] = ()):
-        """Retrieve a single snaphot of market data for this contract."""
+        self.on_tick(tick_type)
+        if size_tick_type:
+            self.on_tick(size_tick_type)
+
+    def fetch_market_data(self, tick_types: typing.Iterable[tick_types.TickTypeGroup] = ()
+                          ) -> typing.Awaitable[None]:
+        """Retrieve a single snapshot of market data for this contract."""
         from .functionality.market_data import MarketDataMixin
         parent = typing.cast(MarketDataMixin, self._parent)
         return parent.get_market_data(self, tick_types, snapshot=True, regulatory_snapshot=False)
@@ -152,7 +164,7 @@ class Instrument(protocol.Serializable):
         """Subscribe to market data for this contract."""
         from .functionality.market_data import MarketDataMixin
         parent = typing.cast(MarketDataMixin, self._parent)
-        return parent.get_market_data(self, tick_types, snapshot=False, regulatory_snapshot=False)
+        parent.get_market_data(self, tick_types, snapshot=False, regulatory_snapshot=False)
 
     def unsubscribe_market_data(self):
         if self._market_data_request_id:

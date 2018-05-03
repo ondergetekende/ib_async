@@ -119,7 +119,7 @@ class ContractDetailsMixin(ProtocolInterface):
         contract.aggregated_group = message.read(str, min_version=ProtocolVersion.AGG_GROUP)
 
         contract.underlying_symbol = message.read(str, min_version=ProtocolVersion.UNDERLYING_INFO)
-        contract.underlying_security_type = message.read(SecurityType)
+        contract.underlying_security_type = message.read(SecurityType, min_version=ProtocolVersion.UNDERLYING_INFO)
 
         contract.market_rule_ids = message.read(str, min_version=ProtocolVersion.MARKET_RULES)
         contract.real_expiration_date = message.read(str, min_version=ProtocolVersion.REAL_EXPIRATION_DATE)
