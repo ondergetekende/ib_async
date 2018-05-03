@@ -17,6 +17,12 @@ _tick_type_size_lookup = {
     tick_types.TickType.DelayedLast: tick_types.TickType.DelayedLastSize,
 }
 
+MarketDepthEntry = typing.NamedTuple('MarketDepthEntry', (
+    ('price', float),
+    ('size', int),
+    ('market_maker', str)
+))
+
 
 class SecurityType(str, enum.Enum):
     UNSPECIFIED = ''
@@ -58,9 +64,13 @@ class Instrument(protocol.Serializable):
         self._market_data_request_id = None  # type: protocol.RequestId
         self._realtime_bars_request_id = None  # type: protocol.RequestId
         self._historical_data_request_id = None  # type: protocol.RequestId
+        self._market_depth_request_id = None  # type: protocol.RequestId
         self.market_data_timeliness = tick_types.MarketDataTimeliness.RealTime
         self._tick_data = {}  # type: typing.Dict[tick_types.TickType, typing.Any]
         self._tick_attributes = {}  # type: typing.Dict[tick_types.TickType, tick_types.TickAttributes]
+
+        self.market_depth_ask = []  # type: typing.List[MarketDepthEntry]
+        self.market_depth_bid = []  # type: typing.List[MarketDepthEntry]
 
         self.symbol = ""
         self.security_type = SecurityType.UNSPECIFIED
@@ -168,3 +178,25 @@ class Instrument(protocol.Serializable):
         from .functionality.realtime_bars import RealtimeBarsMixin
         parent = typing.cast(RealtimeBarsMixin, self._parent)
         return parent.get_historical_bars(self, end_date, duration, bar_size=bar_size, what_to_show=what_to_show)
+
+    def subscribe_market_depth(self, num_rows):
+        from .functionality.market_depth import MarketDepthMixin
+        parent = typing.cast(MarketDepthMixin, self._parent)
+        parent.subscribe_market_depth(self, num_rows)
+
+    def unsubscribe_market_depth(self):
+        from .functionality.market_depth import MarketDepthMixin
+        parent = typing.cast(MarketDepthMixin, self._parent)
+        parent.unsubscribe_market_depth(self)
+
+    def handle_market_depth(self, position: int, market_maker: str, operation: int, side: int, price: float,
+                            size: int):
+        depth_list = self.market_depth_bid if side else self.market_depth_ask
+
+        if operation == 0:  # Insert
+            depth_list.insert(position, MarketDepthEntry(price=price, size=size, market_maker=market_maker))
+        elif operation == 1:  # Update
+            depth_list[position] = MarketDepthEntry(price=price, size=size, market_maker=market_maker)
+        else:  # Delete
+            assert operation == 2
+            del depth_list[position]
