@@ -9,9 +9,9 @@ def to_ib_date(value: typing.Union[str, datetime.datetime, float, int]) -> str:
     if isinstance(value, datetime.datetime):
         # 20180201 10:00:00 GMT
         if value.tzinfo:
-            value = value.strftime("%Y%m%d %H:%D:%S %Z")
+            value = value.strftime("%Y%m%d %H:%M:%S %Z")
         else:
-            value = value.strftime("%Y%m%d %H:%D:%S GMT")
+            value = value.strftime("%Y%m%d %H:%M:%S GMT")
 
     return value
 
