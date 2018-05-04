@@ -24,13 +24,26 @@ def test_subscribe():
     client = MixinFixture()
     instrument = client.test_instrument
 
-    instrument.subscribe_market_data()
+    received = []
 
-    client.assert_one_message_sent(Outgoing.REQ_MKT_DATA, '11', '43', '172604153', 'LLOY', 'STK', partial_match=True)
+    def handler(tick):
+        received.append(tick)
 
+    instrument.market_data_tick_types = [100, 101]
+
+    # Adding a handler should trigger msg
+    instrument.on_market_data += handler
+    client.assert_one_message_sent(Outgoing.REQ_MKT_DATA, '11', '43', instrument, False, '100,101', False, None)
+
+    # Changing params should trigger resubscription
+    instrument.market_data_tick_types = [100]
+    client.assert_one_message_sent(Outgoing.REQ_MKT_DATA, '11', '43', instrument, False, '100', False, None)
+
+    # Check that timeliness is correctly delivered to the instrument
     client.fake_incoming(Incoming.MARKET_DATA_TYPE, 1, 43, 3)
     assert instrument.market_data_timeliness == MarketDataTimeliness.Delayed
 
+    # Test the various messages that deliver market data
     client.fake_incoming(Incoming.TICK_PRICE, 1, 43,
                          TickType.DelayedAsk, 13.37, 13, 0)
 
@@ -52,14 +65,19 @@ def test_subscribe():
 
     assert instrument._tick_data[TickType.BidSize] == 1337
 
+    # Check the event handler was triggered in the right order
+    assert received == [TickType.DelayedAsk, TickType.DelayedAskSize,
+                        TickType.MarkPrice, TickType.Shortable, TickType.BidSize]
+
+    # IB also sends TICK_REQ_PARAMS. Check that, too
     client.fake_incoming(Incoming.TICK_REQ_PARAMS, 43, 0.001, 'LSE', 4)
 
     assert instrument.minimum_tick == 0.001
     assert instrument.bbo_exchange == 'LSE'
     assert instrument.snapshot_permissions == 4
 
-    instrument.unsubscribe_market_data()
-
+    # Removing the last handler should trigger an unsubscription
+    instrument.on_market_data -= handler
     client.assert_one_message_sent(Outgoing.CANCEL_MKT_DATA, 2, 43)
 
 
@@ -76,15 +94,7 @@ def test_fetch():
     assert future.done()
 
 
-def test_double_subscribe():
-    client = MixinFixture()
-    instrument = client.test_instrument
-    instrument.subscribe_market_data()
-    with pytest.raises(ValueError):
-        instrument.subscribe_market_data()
-
-
-def test_regulatory_snaphot():
+def test_regulatory_snapshot():
     client = MixinFixture()
     client.version = ProtocolVersion.MIN_CLIENT
     instrument = client.test_instrument

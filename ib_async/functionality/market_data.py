@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import typing
 
@@ -33,14 +34,17 @@ class MarketDataMixin(ProtocolInterface):
                         tick_types: typing.Iterable[TickTypeGroup] = (),
                         snapshot=False, regulatory_snapshot=False,
                         market_data_options: typing.Dict[str, str] = None) -> typing.Awaitable[None]:
-
-        if instrument._market_data_request_id:
-            raise ValueError('instrument has already been subscribed for market')
-
         if regulatory_snapshot:
             self.check_feature(ProtocolVersion.REQ_SMART_COMPONENTS, "regulatory snapshots")
 
-        request_id, future = self.make_future()
+        if snapshot:
+            request_id, future = self.make_future()
+        elif instrument._market_data_request_id:
+            request_id = instrument._market_data_request_id
+            future = asyncio.Future()
+        else:
+            request_id, future = self.make_future()
+
         message = OutgoingMessage(Outgoing.REQ_MKT_DATA, version=11, request_id=request_id,
                                   protocol_version=self.version)
         message.add(instrument)
@@ -83,19 +87,19 @@ class MarketDataMixin(ProtocolInterface):
     def _handle_tick_price(self, request_id: RequestId, tick_type: TickType, price: float, size: float,
                            attributes: int):
         instrument = self.__instruments[request_id]
-        instrument.tick(tick_type, price, size, TickAttributes.list_from_int(attributes))
+        instrument.handle_market_data(tick_type, price, size, TickAttributes.list_from_int(attributes))
 
     def _handle_tick_generic(self, request_id: RequestId, tick_type: TickType, value: float):
         instrument = self.__instruments[request_id]
-        instrument.tick(tick_type, value)
+        instrument.handle_market_data(tick_type, value)
 
     def _handle_tick_size(self, request_id: RequestId, tick_type: TickType, value: int):
         instrument = self.__instruments[request_id]
-        instrument.tick(tick_type, value)
+        instrument.handle_market_data(tick_type, value)
 
     def _handle_tick_string(self, request_id: RequestId, tick_type: TickType, value: str):
         instrument = self.__instruments[request_id]
-        instrument.tick(tick_type, value)
+        instrument.handle_market_data(tick_type, value)
 
     def _handle_tick_req_params(self, request_id: RequestId, min_tick: float, bbo_exchange: str,
                                 snapshot_permissions: int):

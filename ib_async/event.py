@@ -116,6 +116,7 @@ class Event(typing.Generic[T]):
         Can be used to initiate a data stream."""
         assert not self._on_subscribe, 'only one handler allowed'
         self._on_subscribe = fn
+        return self
 
     def on_unsubscribe(self, fn: typing.Callable[[typing.Any], None]):
         """Decorator to add a handler when th last data consumer loses interest.
@@ -123,3 +124,4 @@ class Event(typing.Generic[T]):
         Can be used to terminate a data stream."""
         assert not self._on_unsubscribe, 'only one handler allowed'
         self._on_unsubscribe = fn
+        return self

@@ -1,3 +1,5 @@
+[ ![Codeship Status for ondergetekende/ib_async](https://app.codeship.com/projects/2c7e6b90-2e79-0136-5387-6651c56c84d3/status?branch=master)](https://app.codeship.com/projects/288237)
+
 An asynchronous implementation of an Interactive Brokers API client.
 
 Design
@@ -25,6 +27,20 @@ client.connect('127.0.0.1', 4001, 100)  # 100 is the client_id.
 instrument = client.get_instrument_by_id('US0378331005', 'ISIN') 
 ```
 
+Receiving market data for said instrument:
+```python
+async for tick_type in instrument.on_market_data:
+    print(tick_type)
+```
+
+Or, if you prefer event handlers:
+```python
+def handle(tick_type):
+    pass
+
+instrument.on_market_data += handle
+```
+
 Features
 ---
 
@@ -34,9 +50,18 @@ Features
 * Support for python >= 3.5
 * High test coverage
 
-Contributing
+API Stability
 ---
 
+This project uses semantic versionions. Starting with the release of 1.0.0, 
+the API will be backward compatible within a major version, and forward 
+compatible within a minor version. This applies to public methods, attributes 
+and enums. Log messages and exact mypy types may change between versions, 
+though. The protocol itself is not considered a public API.
+ 
+
+Contributing
+---
 
 At the moment, development is mostly guided by the needs of the developer. If 
 you need specific functionality, feel free to open an issue. If you need 
@@ -50,16 +75,15 @@ License
 
 Copyright 2018 Koert van der Veer
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at 
-http://www.apache.org/licenses/LICENSE-2.0.
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use 
+this file except in compliance with the License. You may obtain a copy of the 
+License [here](http://www.apache.org/licenses/LICENSE-2.0).
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+Unless required by applicable law or agreed to in writing, software 
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT 
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the 
+License for the specific language governing permissions and limitations under 
+the License.
 
 **Note** depending on your jurisdiction, this library may be considered a 
 derived work of Interactive Brokers intellectual property, and may need to be

@@ -6,7 +6,6 @@ from ib_async import protocol, tick_types
 from ib_async.bar import Bar, BarType
 from ib_async.event import Event
 
-
 LOG = logging.getLogger(__name__)
 
 # lookup table for accompanying sizes for price ticks
@@ -130,15 +129,42 @@ class Instrument(protocol.Serializable):
         # There are several ways a contract is deserialized. I have yet to determine the most common one.
         raise NotImplementedError()
 
-    on_tick = Event()  # type: Event[tick_types.TickType]
+    # ------ Market data ------
 
-    def tick(self, tick_type: tick_types.TickType, value: typing.Any, size: float = None,
-             attributes: tick_types.TickAttributes = None):
+    on_market_data = Event()  # type: Event[tick_types.TickType]
+    _market_data_tick_types = ()  # type: typing.Sequence[tick_types.TickTypeGroup]
+
+    @property
+    def market_data_tick_types(self) -> typing.Sequence[tick_types.TickTypeGroup]:
+        # Determines what market data to subscribe to.
+        return self._market_data_tick_types
+
+    @market_data_tick_types.setter
+    def market_data_tick_types(self, value: typing.Iterable[typing.Union[tick_types.TickTypeGroup, int]]):
+        self._market_data_tick_types = tuple(tick_types.TickTypeGroup(v) for v in value)
+
+        if self.on_market_data.has_subscribers:
+            self.on_market_data.on_subscribe()
+
+    @on_market_data.on_subscribe
+    def __on_market_data_sub(self):
+        from .functionality.market_data import MarketDataMixin
+        parent = typing.cast(MarketDataMixin, self._parent)
+        parent.get_market_data(self, self._market_data_tick_types, snapshot=False, regulatory_snapshot=False)
+
+    @on_market_data.on_unsubscribe
+    def __on_market_data_unsub(self):
+        from .functionality.market_data import MarketDataMixin
+        parent = typing.cast(MarketDataMixin, self._parent)
+        parent.cancel_market_data(self)
+
+    def handle_market_data(self, tick_type: tick_types.TickType, value: typing.Any, size: float = None,
+                           attributes: tick_types.TickAttributes = None):
 
         size_tick_type = None
         if size is not None:
             try:
-                size_tick_type =  _tick_type_size_lookup[tick_type]
+                size_tick_type = _tick_type_size_lookup[tick_type]
             except KeyError:
                 if size:
                     LOG.warning('received tick %s with size, but have no way to store it')
@@ -149,41 +175,35 @@ class Instrument(protocol.Serializable):
         if attributes is not None:
             self._tick_attributes[tick_type] = attributes
 
-        self.on_tick(tick_type)
+        self.on_market_data(tick_type)
         if size_tick_type:
-            self.on_tick(size_tick_type)
+            self.on_market_data(size_tick_type)
 
     def fetch_market_data(self, tick_types: typing.Iterable[tick_types.TickTypeGroup] = ()
                           ) -> typing.Awaitable[None]:
-        """Retrieve a single snapshot of market data for this contract."""
+        """Retrieve a single snapshot of market data for this instrument."""
         from .functionality.market_data import MarketDataMixin
         parent = typing.cast(MarketDataMixin, self._parent)
         return parent.get_market_data(self, tick_types, snapshot=True, regulatory_snapshot=False)
 
-    def subscribe_market_data(self, tick_types: typing.Iterable[tick_types.TickTypeGroup] = ()):
-        """Subscribe to market data for this contract."""
-        from .functionality.market_data import MarketDataMixin
-        parent = typing.cast(MarketDataMixin, self._parent)
-        parent.get_market_data(self, tick_types, snapshot=False, regulatory_snapshot=False)
+    # ------ OHLCV Bars ------
 
-    def unsubscribe_market_data(self):
-        if self._market_data_request_id:
-            from .functionality.market_data import MarketDataMixin
-            parent = typing.cast(MarketDataMixin, self._parent)
-            parent.cancel_market_data(self)
+    on_bar = Event()  # type: Event[Bar]
 
-    def subscribe_realtime_bars(self):
+    @on_bar.on_subscribe
+    def __on_bar_sub(self):
         from .functionality.realtime_bars import RealtimeBarsMixin
         parent = typing.cast(RealtimeBarsMixin, self._parent)
         parent.subscribe_realtime_bars(self)
 
-    def unsubscribe_realtime_bars(self):
+    @on_bar.on_unsubscribe
+    def __on_bar_unsub(self):
         from .functionality.realtime_bars import RealtimeBarsMixin
         parent = typing.cast(RealtimeBarsMixin, self._parent)
         parent.unsubscribe_realtime_bars(self)
 
     def handle_realtime_bar(self, bar: Bar):
-        pass
+        self.on_bar(bar)
 
     def get_historic_bars(self, end_date, duration, bar_size,
                           what_to_show=BarType.Midpoint) -> typing.Awaitable[typing.List[Bar]]:
@@ -191,12 +211,29 @@ class Instrument(protocol.Serializable):
         parent = typing.cast(RealtimeBarsMixin, self._parent)
         return parent.get_historical_bars(self, end_date, duration, bar_size=bar_size, what_to_show=what_to_show)
 
-    def subscribe_market_depth(self, num_rows):
+    # ------ Market depth ------
+
+    on_market_depth = Event()  # type: Event[None]
+    _market_depth_rows = 50
+
+    @property
+    def market_depth_rows(self) -> int:
+        return self._market_depth_rows
+
+    @market_depth_rows.setter
+    def market_depth_rows(self, value: int):
+        self._market_depth_rows = value
+        if self.on_market_depth.has_subscribers:
+            self.on_market_depth.on_subscribe()
+
+    @on_market_depth.on_subscribe
+    def __on_market_depth_sub(self):
         from .functionality.market_depth import MarketDepthMixin
         parent = typing.cast(MarketDepthMixin, self._parent)
-        parent.subscribe_market_depth(self, num_rows)
+        parent.subscribe_market_depth(self, self._market_depth_rows)
 
-    def unsubscribe_market_depth(self):
+    @on_market_depth.on_unsubscribe
+    def __on_market_depth__unsub(self):
         from .functionality.market_depth import MarketDepthMixin
         parent = typing.cast(MarketDepthMixin, self._parent)
         parent.unsubscribe_market_depth(self)
@@ -212,3 +249,5 @@ class Instrument(protocol.Serializable):
         else:  # Delete
             assert operation == 2
             del depth_list[position]
+
+        self.on_market_depth(None)

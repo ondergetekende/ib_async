@@ -1,5 +1,4 @@
 import asyncio
-import unittest.mock
 
 from ib_async.functionality.realtime_bars import RealtimeBarsMixin
 from ib_async.protocol import Outgoing, Incoming
@@ -14,23 +13,26 @@ def test_subscribe():
     t = FixtureMatchingSymbolsMixin()
     instrument = t.test_instrument
 
-    instrument.subscribe_realtime_bars()
+    bars_received = []
+
+    def bar_hander(bar):
+        bars_received.append(bar)
+
+    # adding a handler should trigger a subscription message
+    instrument.on_bar += bar_hander
     t.assert_one_message_sent(Outgoing.REQ_REAL_TIME_BARS, 3, 43, 172604153, 'LLOY', 'STK', partial_match=True)
 
-    instrument.handle_realtime_bar = unittest.mock.MagicMock()
-
+    # Test if bars actually arrives
     t.fake_incoming(Incoming.REAL_TIME_BARS, 2, 43, 1525245478, 4.0, 5.0, 6.0, 7.0, 10, 5.5, 1)
-    assert instrument.handle_realtime_bar.call_count == 1
-    instrument.handle_realtime_bar.reset_mock()
+    assert len(bars_received) == 1
 
-    instrument.unsubscribe_realtime_bars()
+    # removing the last handler should trigger an unsubscribe
+    instrument.on_bar -= bar_hander
     t.assert_one_message_sent(Outgoing.CANCEL_REAL_TIME_BARS, 3, 43)
 
+    # Simulate a stray bar arriving
     t.fake_incoming(Incoming.REAL_TIME_BARS, 2, 43, 1525245478, 4.0, 5.0, 6.0, 7.0, 10, 5.5, 1)
-    instrument.handle_realtime_bar.assert_not_called()
-
-    instrument.unsubscribe_realtime_bars()
-    assert len(t.sent) == 0
+    assert len(bars_received) == 1
 
 
 def test_historical():
