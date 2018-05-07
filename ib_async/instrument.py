@@ -175,6 +175,14 @@ class Instrument(protocol.Serializable):
         self.local_symbol = message.read(str)
         self.trading_class = message.read(str)
 
+    # ------ Equality ------
+
+    def __hash__(self):
+        return hash((self._parent, self._contract_id))
+
+    def __eq__(self, other):
+        return other._contract_id == self._contract_id and other._parent == self._parent
+
     # ------ Market data ------
 
     on_market_data = Event()  # type: Event[tick_types.TickType]

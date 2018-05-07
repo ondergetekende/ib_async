@@ -1,3 +1,4 @@
+import asyncio
 import typing
 
 import ib_async.protocol
@@ -95,3 +96,7 @@ class FunctionalityTestHelper(ib_async.protocol.Protocol):
         instrument.aggregated_group = '6'
         instrument.market_rule_ids = '1874,1874'
         return instrument
+
+
+def run_event_loop():
+    asyncio.get_event_loop().run_until_complete(asyncio.sleep(0))
