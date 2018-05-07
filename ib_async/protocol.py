@@ -26,14 +26,19 @@ TV = typing.TypeVar('TV')
 
 
 class IncomingMessage:
-    def __init__(self, fields: typing.Iterable[str], protocol_version: ProtocolVersion) -> None:
+    def __init__(self, fields: typing.Iterable[str], source: "ProtocolInterface") -> None:
         self.fields = list(fields)
         self.field_parsed = typing.cast(typing.List[SerializableField], fields)
         self.idx = 0
-        self.protocol_version = protocol_version
+        self.source = source
+        self.message_type = None  # type: Incoming
         self.message_version = 0
 
         self.reset()
+
+    @property
+    def protocol_version(self):
+        return self.source.version
 
     def reset(self):
         self.idx = 0
@@ -65,6 +70,19 @@ class IncomingMessage:
     def is_eof(self):
         return self.idx == len(self.fields)
 
+    def peek(self, the_type: typing.Type[T], *,
+             min_version: ProtocolVersion = None, max_version: ProtocolVersion = None,
+             min_message_version: int = None, max_message_version: int = None,
+             default: typing.Optional[T] = None):
+
+        idx = self.idx
+        try:
+            return self.read(the_type, min_version=min_version, max_version=max_version,
+                             min_message_version=min_message_version, max_message_version=max_message_version,
+                             default=default)
+        finally:
+            self.idx = idx
+
     def read(self, the_type: typing.Type[T], *,
              min_version: ProtocolVersion = None, max_version: ProtocolVersion = None,
              min_message_version: int = None, max_message_version: int = None,
@@ -92,7 +110,7 @@ class IncomingMessage:
         """Consume one or more network-representation fields, and turn it into the provided python type."""
 
         if inspect.isclass(the_type) and issubclass(the_type, Serializable):
-            result = the_type()
+            result = the_type.get_instance_from(self)
             result.deserialize(self)
             return result  # type: ignore
 
@@ -108,6 +126,13 @@ class IncomingMessage:
 
         if not text:
             return None
+
+        if the_type.__class__ == typing.Union:
+            # Unpack optionals (which are actually unions with None)
+            args = set(the_type.__args__)  # type: ignore  # noqa
+            args = args.difference({type(None)})  # Remove the NoneType
+            if len(args) == 1:
+                the_type = args.pop()
 
         if the_type is bool:
             # Booleans are transmitted as integers. Zero is False
@@ -226,6 +251,10 @@ class OutgoingMessage:
 
 
 class Serializable(abc.ABC):
+    @classmethod
+    def get_instance_from(cls, source: IncomingMessage):
+        return cls()
+
     @abc.abstractmethod
     def serialize(self, protocol_version: ProtocolVersion) -> typing.Iterable[SerializableField]:
         """Return serializable fields in network-order"""
@@ -356,7 +385,7 @@ class Protocol(ProtocolInterface):
 
     def dispatch_message(self, fields: typing.List[str]):
         assert len(fields) >= 1
-        message = IncomingMessage(fields, protocol_version=self.version)
+        message = IncomingMessage(fields, source=self)
 
         # Find a general-purpose handler
         handler = (getattr(self, "_handle_%s" % message.message_type.name.lower(), None) or

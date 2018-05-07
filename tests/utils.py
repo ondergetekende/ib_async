@@ -30,7 +30,7 @@ class FunctionalityTestHelper(ib_async.protocol.Protocol):
         self.dispatch_message([f.decode() for f in msg_encoded])
 
     def dispatch_message(self, fields: typing.List[str]):
-        message = ib_async.protocol.IncomingMessage(fields, protocol_version=self.version)
+        message = ib_async.protocol.IncomingMessage(fields, source=self)
 
         msg_name = message.message_type.name.lower()
         # Find a general-purpose handler

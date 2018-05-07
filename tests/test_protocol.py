@@ -10,21 +10,19 @@ from ib_async.messages import Incoming, Outgoing
 from ib_async.protocol_versions import ProtocolVersion
 
 
-def test_message_no_version():
-    msg = IncomingMessage(["77", "1"], protocol_version=ProtocolVersion.MIN_CLIENT)
-    assert msg.message_type == Incoming.SOFT_DOLLAR_TIERS
-    assert msg.message_version == 0
-
-
 def test_message_version():
-    msg = IncomingMessage(["2", "10"], protocol_version=ProtocolVersion.MIN_CLIENT)
+    mock_protocol = mock.MagicMock(version=110)
+
+    msg = IncomingMessage(["2", "10"], mock_protocol)
     assert msg.message_type == Incoming.TICK_SIZE
     assert msg.message_version == 10
 
 
 def test_message_read():
     def mk_message_read(the_type, *raw):
-        msg = IncomingMessage(["2", "10"] + list(raw), protocol_version=ProtocolVersion.MIN_CLIENT)
+        mock_protocol = mock.MagicMock(version=110)
+
+        msg = IncomingMessage(["2", "10"] + list(raw), mock_protocol)
         result = msg.read(the_type)
         assert msg.is_eof
         return result
@@ -54,6 +52,12 @@ def test_message_read():
     assert mk_message_read(IntEnum, "2") == IntEnum.T2
 
     class SerializableClass(Serializable):
+        @classmethod
+        def get_instance_from(cls, source):
+            result = cls()
+            result.was_constructed_with_specialize_method = True
+            return result
+
         def serialize(self, protocol_version: ProtocolVersion):
             pass
 
@@ -61,6 +65,7 @@ def test_message_read():
             self.vals = message.read(int), message.read(str)
 
     assert mk_message_read(SerializableClass, "42", 'foo').vals == (42, 'foo')
+    assert mk_message_read(SerializableClass, "42", 'foo').was_constructed_with_specialize_method
 
     class UnknownClass:
         pass
@@ -78,14 +83,17 @@ def test_message_invoke_handler():
         result.extend([arg1, arg2, arg3])
         received_message = msg
 
-    msg = IncomingMessage(["2", "10", '42', 'foo', '1', '13', '17'], protocol_version=ProtocolVersion(110))
+    mock_protocol = mock.MagicMock(version=ProtocolVersion(110))
+
+    msg = IncomingMessage(["2", "10", '42', 'foo', '1', '13', '17'], mock_protocol)
     msg.invoke_handler(handler)
     assert msg == received_message
     assert result == [42, 'foo', {13: 17}]
 
 
 def test_message_versioned():
-    msg = IncomingMessage(["2", 2, "test"], protocol_version=ProtocolVersion(112))
+    mock_protocol = mock.MagicMock(version=ProtocolVersion(112))
+    msg = IncomingMessage(["2", 2, "test"], mock_protocol)
 
     msg.reset()
     assert msg.read(str) == "test"

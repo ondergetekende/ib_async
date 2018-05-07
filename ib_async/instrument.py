@@ -1,6 +1,7 @@
 import enum
 import logging
 import typing
+import weakref
 
 from ib_async import protocol, tick_types
 from ib_async.bar import Bar, BarType
@@ -83,7 +84,7 @@ class Instrument(protocol.Serializable):
         self.local_symbol = ""
         self.market_name = ""
         self.trading_class = ""
-        self.contract_id = 0
+        self._contract_id = 0
         self.minimum_tick = 0.0
         self.market_data_size_multiplier = ""
         self.multiplier = ""
@@ -110,6 +111,40 @@ class Instrument(protocol.Serializable):
         self.real_expiration_date = ""
         self.underlying_component = None  # type: UnderlyingComponent
 
+    @property
+    def contract_id(self):
+        return self._contract_id
+
+    @contract_id.setter
+    def contract_id(self, value):
+        if value != self._contract_id:
+            try:
+                registry = self._parent.__instruments  # type: ignore
+            except AttributeError:
+                registry = self._parent.__instruments = weakref.WeakValueDictionary()  # type: ignore
+
+            assert not registry.get(value)
+            registry.pop(self._contract_id, None)
+            registry[value] = self
+            self._contract_id = value
+
+    @classmethod
+    def get_instance_from(cls, msg: protocol.IncomingMessage):
+        try:
+            registry = msg.source.__instruments  # type: ignore
+        except AttributeError:
+            registry = msg.source.__instruments = weakref.WeakValueDictionary()  # type: ignore
+
+        contract_id = msg.peek(int)
+        try:
+            return registry[contract_id]
+        except KeyError:
+            pass
+
+        result = cls(parent=msg.source)
+        result.contract_id = contract_id
+        return result
+
     def serialize(self, protocol_version):
         # This is the most common (but not the only) way to serialize instruments.
         yield self.contract_id
@@ -126,8 +161,19 @@ class Instrument(protocol.Serializable):
         yield self.trading_class
 
     def deserialize(self, message: protocol.IncomingMessage):
-        # There are several ways a contract is deserialized. I have yet to determine the most common one.
-        raise NotImplementedError()
+        # This is the most common (but not the only) way to serialize instruments.
+        self.contract_id = message.read(int)
+        self.symbol = message.read(str)
+        self.security_type = message.read(str)
+        self.last_trade_date = self.contract_month = message.read(str)
+        self.strike = message.read(float)
+        self.right = message.read(str)
+        self.multiplier = message.read(int)
+        self.exchange = message.read(str)
+        self.primary_exchange = message.read(str)
+        self.currency = message.read(str)
+        self.local_symbol = message.read(str)
+        self.trading_class = message.read(str)
 
     # ------ Market data ------
 

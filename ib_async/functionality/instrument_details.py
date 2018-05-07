@@ -79,50 +79,57 @@ class ContractDetailsMixin(ProtocolInterface):
         return future
 
     def _handle_contract_data(self, request_id: RequestId, message: IncomingMessage):
-        contract = self._pending_contract_updates.get(request_id)
-        if not contract:
-            contract = self._pending_contract_updates[request_id] = Instrument(self)
+        # fast forward to instrument id position, so that we avoid making new contracts when existing ones can be reused
+        # This is required for proper event routing elsewhere
 
-        contract.symbol = message.read(str)
-        contract.security_type = message.read(SecurityType)
-        contract.last_trade_date = message.read(str)
-        contract.strike = message.read(float)
-        contract.right = message.read(str)
-        contract.exchange = message.read(str)
-        contract.currency = message.read(str)
-        contract.local_symbol = message.read(str)
-        contract.market_name = message.read(str)
-        contract.trading_class = message.read(str)
-        contract.contract_id = message.read(int)
-        contract.minimum_tick = message.read(float)
+        instrument = self._pending_contract_updates.get(request_id)
 
-        contract.market_data_size_multiplier = message.read(str, min_version=ProtocolVersion.MD_SIZE_MULTIPLIER)
+        if not instrument:
+            message.idx += 10
+            instrument = Instrument.get_instance_from(message)
+            self._pending_contract_updates[request_id] = instrument
+            message.idx -= 10
 
-        contract.multiplier = message.read(str)
-        contract.order_types = message.read(str).split(',')
-        contract.valid_exchanges = message.read(str).split(',')
-        contract.price_magnifier = message.read(int)
-        contract.underlying_contract_id = message.read(int)
-        contract.long_name = message.read(str)
-        contract.primary_exchange = message.read(str)
-        contract.contract_month = message.read(str)
-        contract.industry = message.read(str)
-        contract.category = message.read(str)
-        contract.subcategory = message.read(str)
-        contract.time_zone = message.read(str)
-        contract.trading_hours = message.read(str)
-        contract.liquid_hours = message.read(str)
-        contract.ev_rule = message.read(str)
-        contract.ev_multiplier = message.read(str)
-        contract.security_ids = message.read(typing.Dict[SecurityIdentifierType, str])
+        instrument.symbol = message.read(str)
+        instrument.security_type = message.read(SecurityType)
+        instrument.last_trade_date = message.read(str)
+        instrument.strike = message.read(float)
+        instrument.right = message.read(str)
+        instrument.exchange = message.read(str)
+        instrument.currency = message.read(str)
+        instrument.local_symbol = message.read(str)
+        instrument.market_name = message.read(str)
+        instrument.trading_class = message.read(str)
+        instrument.contract_id = message.read(int)
+        instrument.minimum_tick = message.read(float)
 
-        contract.aggregated_group = message.read(str, min_version=ProtocolVersion.AGG_GROUP)
+        instrument.market_data_size_multiplier = message.read(str, min_version=ProtocolVersion.MD_SIZE_MULTIPLIER)
 
-        contract.underlying_symbol = message.read(str, min_version=ProtocolVersion.UNDERLYING_INFO)
-        contract.underlying_security_type = message.read(SecurityType, min_version=ProtocolVersion.UNDERLYING_INFO)
+        instrument.multiplier = message.read(str)
+        instrument.order_types = message.read(str).split(',')
+        instrument.valid_exchanges = message.read(str).split(',')
+        instrument.price_magnifier = message.read(int)
+        instrument.underlying_contract_id = message.read(int)
+        instrument.long_name = message.read(str)
+        instrument.primary_exchange = message.read(str)
+        instrument.contract_month = message.read(str)
+        instrument.industry = message.read(str)
+        instrument.category = message.read(str)
+        instrument.subcategory = message.read(str)
+        instrument.time_zone = message.read(str)
+        instrument.trading_hours = message.read(str)
+        instrument.liquid_hours = message.read(str)
+        instrument.ev_rule = message.read(str)
+        instrument.ev_multiplier = message.read(str)
+        instrument.security_ids = message.read(typing.Dict[SecurityIdentifierType, str])
 
-        contract.market_rule_ids = message.read(str, min_version=ProtocolVersion.MARKET_RULES)
-        contract.real_expiration_date = message.read(str, min_version=ProtocolVersion.REAL_EXPIRATION_DATE)
+        instrument.aggregated_group = message.read(str, min_version=ProtocolVersion.AGG_GROUP)
+
+        instrument.underlying_symbol = message.read(str, min_version=ProtocolVersion.UNDERLYING_INFO)
+        instrument.underlying_security_type = message.read(SecurityType, min_version=ProtocolVersion.UNDERLYING_INFO)
+
+        instrument.market_rule_ids = message.read(str, min_version=ProtocolVersion.MARKET_RULES)
+        instrument.real_expiration_date = message.read(str, min_version=ProtocolVersion.REAL_EXPIRATION_DATE)
 
     def _handle_contract_data_end(self, request_id: RequestId):
         contract = self._pending_contract_updates.get(request_id)
