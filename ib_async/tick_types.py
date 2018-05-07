@@ -353,3 +353,29 @@ class TickType(enum.Enum):
 
     # fill the missing gap
     UNKNOWN_86 = 86
+
+
+LastTick = typing.NamedTuple('LastTick', (
+    ('timestamp', int),
+    ('price', float),
+    ('size', int),
+    ('past_limit', bool),
+    ('unreported', bool),
+    ('exchange', str),
+    ('special_conditions', str),
+))
+
+BidAskTick = typing.NamedTuple('BidAskTick', (
+    ('timestamp', int),
+    ('bid_price', float),
+    ('ask_price', float),
+    ('bid_size', int),
+    ('ask_size', int),
+    ('bid_past_low', bool),
+    ('ask_past_high', bool),
+))
+
+MidpointTick = typing.NamedTuple('MidpointTick', (
+    ('timestamp', int),
+    ('midpoint', float),
+))

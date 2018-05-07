@@ -251,3 +251,58 @@ class Instrument(protocol.Serializable):
             del depth_list[position]
 
         self.on_market_depth(None)
+
+    # ------ Tick by Tick ------
+
+    on_tick_by_tick_last = Event()  # type: Event[tick_types.LastTick]
+    on_tick_by_tick_all = Event()  # type: Event[tick_types.LastTick]
+    on_tick_by_tick_bidask = Event()  # type: Event[tick_types.BidAskTick]
+    on_tick_by_tick_midpoint = Event()  # type: Event[tick_types.MidpointTick]
+
+    @on_tick_by_tick_last.on_subscribe
+    def __on_tick_by_tick_last__subscribe(self):
+        from .functionality.tickbytick import TickByTickMixin
+        parent = typing.cast(TickByTickMixin, self._parent)
+        parent.subscribe_tick_by_tick(self, 'Last')
+
+    @on_tick_by_tick_last.on_unsubscribe
+    def __on_tick_by_tick_last__unsubscribe(self):
+        from .functionality.tickbytick import TickByTickMixin
+        parent = typing.cast(TickByTickMixin, self._parent)
+        parent.unsubscribe_tick_by_tick(self, 'Last')
+
+    @on_tick_by_tick_all.on_subscribe
+    def __on_tick_by_tick_all__subscribe(self):
+        from .functionality.tickbytick import TickByTickMixin
+        parent = typing.cast(TickByTickMixin, self._parent)
+        parent.subscribe_tick_by_tick(self, 'AllLast')
+
+    @on_tick_by_tick_all.on_unsubscribe
+    def __on_tick_by_tick_all__unsubscribe(self):
+        from .functionality.tickbytick import TickByTickMixin
+        parent = typing.cast(TickByTickMixin, self._parent)
+        parent.unsubscribe_tick_by_tick(self, 'AllLast')
+
+    @on_tick_by_tick_bidask.on_subscribe
+    def __on_tick_by_tick_bidask__subscribe(self):
+        from .functionality.tickbytick import TickByTickMixin
+        parent = typing.cast(TickByTickMixin, self._parent)
+        parent.subscribe_tick_by_tick(self, 'BidAsk')
+
+    @on_tick_by_tick_bidask.on_unsubscribe
+    def __on_tick_by_tick_bidask__unsubscribe(self):
+        from .functionality.tickbytick import TickByTickMixin
+        parent = typing.cast(TickByTickMixin, self._parent)
+        parent.unsubscribe_tick_by_tick(self, 'BidAsk')
+
+    @on_tick_by_tick_midpoint.on_subscribe
+    def __on_tick_by_tick_midpoint__subscribe(self):
+        from .functionality.tickbytick import TickByTickMixin
+        parent = typing.cast(TickByTickMixin, self._parent)
+        parent.subscribe_tick_by_tick(self, 'Midpoint')
+
+    @on_tick_by_tick_midpoint.on_unsubscribe
+    def __on_tick_by_tick_midpoint__unsubscribe(self):
+        from .functionality.tickbytick import TickByTickMixin
+        parent = typing.cast(TickByTickMixin, self._parent)
+        parent.unsubscribe_tick_by_tick(self, 'Midpoint')

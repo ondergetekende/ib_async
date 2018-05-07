@@ -255,6 +255,10 @@ class ProtocolInterface(abc.ABC):
         """Checks if we're using a minimal protocol level, and raisess an exception otherwise."""
 
     @abc.abstractmethod
+    def make_request_id(self) -> RequestId:
+        """Generates a unique request id and associated future"""
+
+    @abc.abstractmethod
     def make_future(self) -> typing.Tuple[RequestId, asyncio.Future]:
         """Generates a unique request id and associated future"""
 
