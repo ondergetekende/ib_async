@@ -31,8 +31,8 @@ class Bar(protocol.Serializable):
         self.count = None  # type: int
         self.has_gaps = ""
 
-    def serialize(self, protocol_version: protocol.ProtocolVersion, *, serializing_historic=False):
-        yield from [
+    def serialize(self, message: protocol.OutgoingMessage, *, serializing_historic=False):
+        message.add(
             self.time,
             self.open,
             self.high,
@@ -40,10 +40,13 @@ class Bar(protocol.Serializable):
             self.close,
             self.volume,
             self.average,
-        ]
-        if protocol_version < protocol.ProtocolVersion.SYNT_REALTIME_BARS and serializing_historic:
-            yield self.has_gaps
-        yield self.count
+        )
+
+        if serializing_historic:
+            message.add(self.has_gaps,
+                        max_version=protocol.ProtocolVersion.SYNT_REALTIME_BARS)
+
+        message.add(self.count)
 
     def deserialize(self, message: protocol.IncomingMessage, *, deserializing_historic=False):
         self.time = message.read(int)
@@ -59,8 +62,8 @@ class Bar(protocol.Serializable):
 
 
 class HistoricBar(Bar):
-    def serialize(self, protocol_version: protocol.ProtocolVersion, *, serializing_historic=True):
-        return super().serialize(protocol_version, serializing_historic=True)
+    def serialize(self, message: protocol.OutgoingMessage, *, serializing_historic=True):
+        return super().serialize(message, serializing_historic=True)
 
     def deserialize(self, message: protocol.IncomingMessage, *, deserializing_historic=True):
         return super().deserialize(message, deserializing_historic=True)

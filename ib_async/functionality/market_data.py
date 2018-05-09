@@ -45,8 +45,7 @@ class MarketDataMixin(ProtocolInterface):
         else:
             request_id, future = self.make_future()
 
-        message = OutgoingMessage(Outgoing.REQ_MKT_DATA, version=11, request_id=request_id,
-                                  protocol_version=self.version)
+        message = OutgoingMessage(Outgoing.REQ_MKT_DATA, 11, request_id, protocol_version=self.version)
         message.add(instrument)
 
         if instrument.security_type == 'BAG':
@@ -80,7 +79,7 @@ class MarketDataMixin(ProtocolInterface):
 
     def cancel_market_data(self, instrument: Instrument):
         """Cancels a RT Market Data request."""
-        message = OutgoingMessage(Outgoing.CANCEL_MKT_DATA, version=2, request_id=instrument._market_data_request_id)
+        message = OutgoingMessage(Outgoing.CANCEL_MKT_DATA, 2, instrument._market_data_request_id)
         self.send(message)
         instrument._market_data_request_id = None
 

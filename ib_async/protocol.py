@@ -185,18 +185,16 @@ class IncomingMessage:
 
 class OutgoingMessage:
     def __init__(self, message_type: Outgoing, *fields,
-                 version: int = None, request_id: RequestId = None,
                  protocol_version: ProtocolVersion = None) -> None:
-        message_type = Outgoing(message_type)
-        self.fields = [message_type]  # type: typing.List[SerializableField]
-        self.fields.extend(fields)
+        self.fields_encoded = []  # type: typing.List[bytes]
+        self.fields = []  # type: typing.List[SerializableField]
         self.protocol_version = protocol_version
 
-        if version is not None:
-            self.fields.append(version)
+        message_type = Outgoing(int(message_type))
 
-        if request_id is not None:
-            self.fields.append(request_id)
+        self.add(message_type)
+        for field in fields:
+            self.add(field)
 
     def add(self, *fields: SerializableField,
             min_version: ProtocolVersion = None,
@@ -206,44 +204,41 @@ class OutgoingMessage:
         elif max_version and self.protocol_version >= max_version:
             pass
         else:
-            self.fields.extend(fields)
+            for field in fields:
+                self._add_field(field)
 
-    def _serialize_field(self, field: SerializableField) -> bytes:
-        """Take a single field, and turn it into the appropriate network representation"""
+    def _add_field(self, field: SerializableField, raw_field=None):
+        if isinstance(field, Serializable):
+            field.serialize(self)
+            return
+
+        self.fields.append(raw_field if raw_field is not None else field)
+
         if isinstance(field, enum.Enum):
             field = field.value  # Enums are sent as their underlying type
 
-        if isinstance(field, Serializable):
-            return b"\0".join(self._serialize_field(sub_field)
-                              for sub_field in field.serialize(self.protocol_version))
-
         if field is None:
-            return b""
-
-        if isinstance(field, str):  # bool type is encoded as int
-            return field.encode()
-
-        if isinstance(field, bool):  # bool type is encoded as int
-            return b"1" if field else b'0'
-
-        if isinstance(field, (float, int)):
-            return str(field).encode()
-
-        if isinstance(field, dict):
-            vals = [self._serialize_field(len(field))]
+            self.fields_encoded.append(b"")
+        elif isinstance(field, str):  # bool type is encoded as int
+            self.fields_encoded.append(field.encode())
+        elif isinstance(field, bool):  # bool type is encoded as int
+            self.fields_encoded.append(b"1" if field else b'0')
+        elif isinstance(field, (float, int)):
+            self.fields_encoded.append(str(field).encode())
+        elif isinstance(field, dict):
+            self._add_field(len(field), field)
             for key, value in field.items():
-                vals.extend([self._serialize_field(key), self._serialize_field(value)])
-            return b"\0".join(vals)
-
-        if isinstance(field, list):
-            vals = [self._serialize_field(len(field))]
-            vals.extend(self._serialize_field(value) for value in field)
-            return b"\0".join(vals)
-
-        raise ValueError('unsupported type')
+                self._add_field(key)
+                self._add_field(value)
+        elif isinstance(field, list):
+            self._add_field(len(field), field)
+            for value in field:
+                self._add_field(value)
+        else:
+            raise ValueError('unsupported type')
 
     def serialize(self) -> bytes:
-        encoded_message = b"\x00".join(self._serialize_field(field) for field in self.fields) + b'\x00'
+        encoded_message = b"\x00".join(self.fields_encoded) + b'\x00'
         return struct.pack("!I", len(encoded_message)) + encoded_message
 
     def __repr__(self):
@@ -256,7 +251,7 @@ class Serializable(abc.ABC):
         return cls()
 
     @abc.abstractmethod
-    def serialize(self, protocol_version: ProtocolVersion) -> typing.Iterable[SerializableField]:
+    def serialize(self, message: OutgoingMessage):
         """Return serializable fields in network-order"""
         raise NotImplementedError()
 
@@ -272,7 +267,7 @@ class ProtocolInterface(abc.ABC):
         self.version = None  # type: ProtocolVersion
 
     def send_message(self, message_id: Outgoing, *fields: SerializableField):
-        self.send(OutgoingMessage(message_id, *fields))
+        self.send(OutgoingMessage(message_id, *fields, protocol_version=self.version))
 
     @abc.abstractmethod
     def send(self, message: OutgoingMessage):

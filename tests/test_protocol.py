@@ -58,7 +58,7 @@ def test_message_read():
             result.was_constructed_with_specialize_method = True
             return result
 
-        def serialize(self, protocol_version: ProtocolVersion):
+        def serialize(self, message: OutgoingMessage):
             pass
 
         def deserialize(self, message: IncomingMessage):
@@ -118,31 +118,34 @@ def test_message_versioned():
 
 
 def test_outgoing_serialize():
-    msg = OutgoingMessage(Outgoing.REQ_HISTORICAL_TICKS)
-    assert msg._serialize_field("") == b''
-    assert msg._serialize_field(1) == b'1'
-    assert msg._serialize_field(1.01) == b'1.01'
-    assert msg._serialize_field(True) == b'1'
-    assert msg._serialize_field(False) == b'0'
-    assert msg._serialize_field([""]) == b'1\0'
-    assert msg._serialize_field({'a': 1}) == b'1\0a\x001'
-    assert msg._serialize_field(ProtocolVersion(112)) == b'112'
-    assert msg._serialize_field(None) == b''
+    def _serialize(s):
+        msg = OutgoingMessage(Outgoing.REQ_HISTORICAL_TICKS, s)
+        return b"\x00".join(msg.fields_encoded[1:])
+
+    assert _serialize("") == b''
+    assert _serialize(1) == b'1'
+    assert _serialize(1.01) == b'1.01'
+    assert _serialize(True) == b'1'
+    assert _serialize(False) == b'0'
+    assert _serialize([""]) == b'1\0'
+    assert _serialize({'a': 1}) == b'1\0a\x001'
+    assert _serialize(ProtocolVersion(112)) == b'112'
+    assert _serialize(None) == b''
 
     class SerializableClass(Serializable):
         def deserialize(self, message: IncomingMessage):
             pass
 
-        def serialize(self, protocol_version: ProtocolVersion):
-            return [42, "foo"]
+        def serialize(self, message: OutgoingMessage):
+            message.add(42, "foo")
 
-    assert msg._serialize_field(SerializableClass()) == b'42\x00foo'
+    assert _serialize(SerializableClass()) == b'42\x00foo'
 
     class UnknownClass:
         pass
 
     with pytest.raises(ValueError):
-        msg._serialize_field(UnknownClass())
+        _serialize(UnknownClass())
 
 
 def test_protocol_futures():

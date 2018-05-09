@@ -1,6 +1,8 @@
 import asyncio
 import typing
 
+import pytest
+
 import ib_async.protocol
 import ib_async.instrument
 
@@ -14,10 +16,10 @@ class FunctionalityTestHelper(ib_async.protocol.Protocol):
         self.next_request_id = ib_async.protocol.RequestId(43)
         self.version = ib_async.protocol.ProtocolVersion(110)
         self.futures = {}
-        self.sent = []  # type: typing.List[bytes]
+        self.sent = []  # type: typing.List[ib_async.protocol.OutgoingMessage]
 
     def send(self, message: ib_async.protocol.OutgoingMessage):
-        self.sent.append(message.serialize()[4:])
+        self.sent.append(message)
 
     def fake_incoming(self, *fields):
         # use a fake outgoing message to serialize the arguments
@@ -41,22 +43,48 @@ class FunctionalityTestHelper(ib_async.protocol.Protocol):
         message.invoke_handler(handler)
 
     def assert_message_sent(self, *arguments, partial_match=False):
-        msg = ib_async.protocol.OutgoingMessage(*arguments).serialize()[4:]
-        if partial_match:
-            assert any(sent_message.startswith(msg) for sent_message in self.sent)
+        expected_msg = ib_async.protocol.OutgoingMessage(*arguments)
+
+        assert self.sent, "Expected a message, but none were sent"
+
+        for sent_message in self.sent:
+            if sent_message.fields_encoded[0] == expected_msg.fields_encoded[0]:
+                actual_msg = sent_message
+                break
         else:
-            assert msg in self.sent
+            actual_msg = self.sent[0]
+
+        # Check for full match
+        if actual_msg.fields_encoded == expected_msg.fields_encoded:
+            return
+
+        prefix_length = 0
+        for f0, f1 in zip(expected_msg.fields_encoded, actual_msg.fields_encoded):
+            if f0 != f1:
+                break
+            prefix_length += 1
+        else:
+            if partial_match:
+                return
+            elif len(expected_msg.fields_encoded) > len(actual_msg.fields_encoded):
+                pytest.fail("Actual message had missing fields, missing %r" % (expected_msg.fields[prefix_length:]))
+            else:
+                pytest.fail("Actual message had extra fields" % (actual_msg.fields[prefix_length:]))
+
+        pytest.fail("Messages did not match, from offset %i: expected: %s != %s" % (
+            prefix_length,
+            ",".join(repr(x) for x in expected_msg.fields[prefix_length:prefix_length + 7]),
+            ",".join(repr(x) for x in actual_msg.fields[prefix_length:prefix_length + 7:])))
 
     def assert_one_message_sent(self, *arguments, partial_match=False):
         if len(self.sent) != 1:
             assert False, "Expected one message to be sent, actually saw %i" % len(self.sent)
 
-        try:
-            self.assert_message_sent(*arguments, partial_match=partial_match)
-        except AssertionError:
-            msg = [f.decode() for f in self.sent[0].split(b'\x00')[:-1]]
-            assert False, "Got %r" % ib_async.protocol.OutgoingMessage(int(msg[0]), *msg[1:],
-                                                                       protocol_version=self.version)
+        self.assert_message_sent(*arguments, partial_match=partial_match)
+        # except AssertionError:
+        #     msg = [f.decode() for f in self.sent[0].split(b'\x00')[:-1]]
+        #     assert False, "Got %r" % ib_async.protocol.OutgoingMessage(int(msg[0]), *msg[1:],
+        #                                                                protocol_version=self.version)
 
         self.sent = []
 

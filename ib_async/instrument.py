@@ -51,8 +51,9 @@ class UnderlyingComponent(protocol.Serializable):
         self.delta = 0.0
         self.price = 0.0
 
-    def serialize(self, protocol_version):
-        return self.contract_id, self.delta, self.price
+    def serialize(self, message: protocol.OutgoingMessage):
+        message.add(self.contract_id, self.delta, self.price)
+        return
 
     def deserialize(self, message: protocol.IncomingMessage):
         self.contract_id = message.read(int)
@@ -145,20 +146,22 @@ class Instrument(protocol.Serializable):
         result.contract_id = contract_id
         return result
 
-    def serialize(self, protocol_version):
+    def serialize(self, message: protocol.OutgoingMessage):
         # This is the most common (but not the only) way to serialize instruments.
-        yield self.contract_id
-        yield self.symbol
-        yield self.security_type
-        yield self.last_trade_date or self.contract_month
-        yield self.strike
-        yield self.right
-        yield self.multiplier
-        yield self.exchange
-        yield self.primary_exchange
-        yield self.currency
-        yield self.local_symbol
-        yield self.trading_class
+        message.add(
+            self.contract_id,
+            self.symbol,
+            self.security_type,
+            self.last_trade_date or self.contract_month,
+            self.strike,
+            self.right,
+            self.multiplier,
+            self.exchange,
+            self.primary_exchange,
+            self.currency,
+            self.local_symbol,
+            self.trading_class,
+        )
 
     def deserialize(self, message: protocol.IncomingMessage):
         # This is the most common (but not the only) way to serialize instruments.

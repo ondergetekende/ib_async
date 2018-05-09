@@ -18,10 +18,13 @@ def test_serialize_underlying_component():
     assert comp.delta == 5.1
     assert comp.price == 2.1
 
-    m = comp.serialize(ib_async.protocol.ProtocolVersion.MIN_CLIENT)
-    assert m[0] == 5
-    assert m[1] == 5.1
-    assert m[2] == 2.1
+    m = ib_async.protocol.OutgoingMessage(ib_async.protocol.Outgoing.PLACE_ORDER,
+                                          protocol_version=ib_async.protocol.ProtocolVersion.MIN_CLIENT)
+
+    comp.serialize(m)
+    assert m.fields[1] == 5
+    assert m.fields[2] == 5.1
+    assert m.fields[3] == 2.1
 
 
 def test_serialize_instrument():
