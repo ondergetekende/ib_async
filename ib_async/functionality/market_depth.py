@@ -20,13 +20,7 @@ class MarketDepthMixin(ProtocolInterface):
             self.resolve_future(request_id, None)
 
         self.send_message(Outgoing.REQ_MKT_DEPTH, 5, request_id,
-                          # We cannot use the instrument serialization, as this specific message has different fields
-                          instrument.contract_id, instrument.symbol, instrument.security_type,
-                          instrument.contract_month or instrument.last_trade_date,
-                          instrument.strike, instrument.right,
-                          instrument.multiplier, instrument.exchange,
-                          instrument.currency, instrument.local_symbol, instrument.trading_class,
-                          num_rows,
+                          instrument, num_rows,
                           {})  # options. Undocumented
 
         self.__instruments[request_id] = instrument

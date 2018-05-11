@@ -6,6 +6,7 @@ import weakref
 from ib_async import protocol, tick_types
 from ib_async.bar import Bar, BarType
 from ib_async.event import Event
+from ib_async.messages import Outgoing, Incoming
 
 LOG = logging.getLogger(__name__)
 
@@ -156,8 +157,12 @@ class Instrument(protocol.Serializable):
             self.strike,
             self.right,
             self.multiplier,
-            self.exchange,
-            self.primary_exchange,
+            self.exchange)
+
+        if message.message_type not in (Outgoing.REQ_MKT_DEPTH,):
+            message.add(self.primary_exchange)
+
+        message.add(
             self.currency,
             self.local_symbol,
             self.trading_class,
@@ -173,7 +178,8 @@ class Instrument(protocol.Serializable):
         self.right = message.read(str)
         self.multiplier = message.read(int)
         self.exchange = message.read(str)
-        self.primary_exchange = message.read(str)
+        if message.message_type not in (Incoming.OPEN_ORDER, Incoming.CONTRACT_DATA):
+            self.primary_exchange = message.read(str)
         self.currency = message.read(str)
         self.local_symbol = message.read(str)
         self.trading_class = message.read(str)
