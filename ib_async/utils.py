@@ -1,3 +1,4 @@
+import asyncio
 import datetime
 import typing
 
@@ -27,3 +28,12 @@ def to_ib_duration(value: typing.Union[str, datetime.timedelta, float, int]) -> 
             return "%i S" % int(value)
 
     return value
+
+
+T = typing.TypeVar('T')
+
+
+def wrap_immediate_future(result: T) -> "asyncio.Future[T]":
+    future = asyncio.Future()  # type: asyncio.Future[T]
+    future.set_result(result)
+    return future

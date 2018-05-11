@@ -29,3 +29,10 @@ def test_to_ib_duration():
     assert utils.to_ib_duration(86400 * 365) == '365 D'
     assert utils.to_ib_duration(datetime.timedelta(seconds=17)) == '17 S'
     assert utils.to_ib_duration("17 S") == '17 S'
+
+
+def test_wrap_fut():
+    x = object()
+    fut = utils.wrap_immediate_future(x)
+    assert fut.done()
+    assert fut.result() is x
