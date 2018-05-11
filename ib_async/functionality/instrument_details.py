@@ -79,8 +79,8 @@ class ContractDetailsMixin(ProtocolInterface):
         return future
 
     def _handle_contract_data(self, request_id: RequestId, message: IncomingMessage):
-        # fast forward to instrument id position, so that we avoid making new contracts when existing ones can be reused
-        # This is required for proper event routing elsewhere
+        # fast forward to instrument id position, so that we avoid making new contracts when existing ones can be
+        # reused. This is required for proper event routing elsewhere
 
         instrument = self._pending_contract_updates.get(request_id)
 
