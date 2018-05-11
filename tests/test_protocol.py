@@ -1,6 +1,7 @@
 import enum
 from unittest import mock
 import typing
+import sys
 
 import pytest
 
@@ -27,10 +28,13 @@ def test_message_read():
         assert msg.is_eof
         return result
 
-    assert mk_message_read(int, "2") == 2
     assert mk_message_read(RequestId, "2") == RequestId(2)
     assert mk_message_read(float, "2") == 2.0
+    assert mk_message_read(float, str(sys.float_info.max)) is None
+    assert mk_message_read(float, "") is None
+    assert mk_message_read(int, "2") == 2
     assert mk_message_read(int, "") is None
+    assert mk_message_read(int, str((1 << 31) - 1)) is None
     assert mk_message_read(str, "2") == "2"
     assert mk_message_read(bool, "2") is True
     assert mk_message_read(bool, "0") is False

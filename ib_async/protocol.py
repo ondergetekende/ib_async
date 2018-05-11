@@ -58,6 +58,9 @@ class IncomingMessage:
                 call_data.extend(self.fields[self.idx:])
                 break
 
+            assert parameter.annotation != inspect.Parameter.empty, "Untyped parameter %s:%s" % (
+                handler.__name__, parameter.name)
+
             assert parameter.kind in (0, 1)
             if parameter.annotation == IncomingMessage:
                 call_data.append(self)
@@ -83,7 +86,7 @@ class IncomingMessage:
         finally:
             self.idx = idx
 
-    def read(self, the_type: typing.Type[T], *,
+    def read(self, the_type: typing.Type[T] = str, *,  # type: ignore
              min_version: ProtocolVersion = None, max_version: ProtocolVersion = None,
              min_message_version: int = None, max_message_version: int = None,
              default: typing.Optional[T] = None):
@@ -151,10 +154,12 @@ class IncomingMessage:
             return text  # type: ignore
 
         if issubclass(the_type, int):
-            return the_type(text)  # type: ignore
+            result = the_type(text)
+            return None if result >= 2147483647 else result  # type: ignore
 
         if issubclass(the_type, float):
-            return the_type(text)  # type: ignore
+            result = the_type(text)  # type: ignore
+            return None if result >= 1.7976931348623157E308 else result  # type: ignore
 
         if the_type is dict:
             the_type = typing.Dict[str, str]  # type: ignore
@@ -175,7 +180,7 @@ class IncomingMessage:
             # IB only supports str/str dicts, stored as a KVP array
             return [self._read_inner(value_type) for _ in range(int(text))]  # type: ignore
 
-        raise ValueError('unsupported type')
+        raise ValueError('unsupported type: %s' % the_type)
 
     def __repr__(self):
         return "IncomingMessage(%s, %s, protocol_version=%s)" % (
@@ -190,9 +195,9 @@ class OutgoingMessage:
         self.fields = []  # type: typing.List[SerializableField]
         self.protocol_version = protocol_version
 
-        message_type = Outgoing(int(message_type))
+        self.message_type = Outgoing(int(message_type))
 
-        self.add(message_type)
+        self.add(self.message_type)
         for field in fields:
             self.add(field)
 
