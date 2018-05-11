@@ -90,7 +90,12 @@ class FunctionalityTestHelper(ib_async.protocol.Protocol):
 
     @property
     def test_instrument(self):
-        instrument = ib_async.instrument.Instrument(self)
+        try:
+            return self._test_instrument  # type: ignore  # noqa
+        except AttributeError:
+            pass
+
+        instrument = self._test_instrument = ib_async.instrument.Instrument(self)
 
         instrument.symbol = 'LLOY'
         instrument.security_type = ib_async.instrument.SecurityType.Stock
