@@ -1,6 +1,7 @@
 from ib_async.functionality.current_time import CurrentTimeMixin
-from ib_async.functionality.matching_symbols import MatchingSymbolsMixin
+from ib_async.functionality.executions import ExecutionsMixin
 from ib_async.functionality.instrument_details import ContractDetailsMixin
+from ib_async.functionality.matching_symbols import MatchingSymbolsMixin
 from ib_async.functionality.market_data import MarketDataMixin
 from ib_async.functionality.market_depth import MarketDepthMixin
 from ib_async.functionality.realtime_bars import RealtimeBarsMixin
@@ -14,7 +15,7 @@ from ib_async.tick_types import TickType, TickTypeGroup, MarketDataTimeliness
 
 
 class IBClient(CurrentTimeMixin, MatchingSymbolsMixin, ContractDetailsMixin, MarketDataMixin, RealtimeBarsMixin,
-               MarketDepthMixin, TickByTickMixin, PositionMixin, OrdersMixin,
+               MarketDepthMixin, TickByTickMixin, PositionMixin, OrdersMixin, ExecutionsMixin,
                Protocol):
     # All of the functionality is delegated to the mixins and Protocol.
     pass

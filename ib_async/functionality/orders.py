@@ -15,7 +15,6 @@ OrderEvent = typing.NamedTuple("OrderEvent", [
     ('instrument', Instrument),
     ('size', float),
     ('average_cost', typing.Optional[float])
-
 ])
 
 
@@ -31,6 +30,10 @@ class OrdersMixin(ProtocolInterface):
         self._next_order_id = 1
         self.__submitted_future = {}
         self.__open_orders_future = None
+
+    def get_order(self, order_id: int) -> typing.Optional[Order]:
+        """Returns the order, if it is known. Note that the client doesn't know about all orders."""
+        return self.__orders.get(order_id)
 
     def get_open_orders(self) -> typing.Awaitable[typing.List[Order]]:
         if not self.__open_orders_future:

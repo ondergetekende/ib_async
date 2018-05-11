@@ -3,7 +3,8 @@ import typing  # noqa
 
 from ib_async.errors import UnsupportedFeature
 from ib_async.event import Event
-from ib_async.instrument import Instrument, UnderlyingComponent  # noqa
+from ib_async import execution  # noqa
+from ib_async.instrument import Instrument  # noqa
 from ib_async.protocol import ProtocolInterface, Serializable, ProtocolVersion, IncomingMessage, OutgoingMessage
 
 
@@ -291,6 +292,7 @@ class Order(Serializable):
         self.mifid2_execution_algo = ""
 
     updated = Event()  # type: Event[None]
+    on_execution = Event()  # type: Event[execution.Execution]
 
     def serialize(self, message: OutgoingMessage):
         message.add(self.order_id)

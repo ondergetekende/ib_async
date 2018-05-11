@@ -6,6 +6,7 @@ import weakref
 from ib_async import protocol, tick_types
 from ib_async.bar import Bar, BarType
 from ib_async.event import Event
+from ib_async import execution # noqa
 from ib_async.messages import Outgoing, Incoming
 
 LOG = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ MarketDepthEntry = typing.NamedTuple('MarketDepthEntry', (
 
 
 class SecurityType(str, enum.Enum):
-    UNSPECIFIED = ''
+    Unspecified = ''
 
     Stock = 'STK'
     Cash = 'CASH'
@@ -77,7 +78,7 @@ class Instrument(protocol.Serializable):
         self.market_depth_bid = []  # type: typing.List[MarketDepthEntry]
 
         self.symbol = ""
-        self.security_type = SecurityType.UNSPECIFIED
+        self.security_type = SecurityType.Unspecified
         self.last_trade_date = ""
         self.strike = 0.0
         self.right = ""
@@ -108,7 +109,7 @@ class Instrument(protocol.Serializable):
         self.security_ids = {}  # type: typing.Dict[SecurityIdentifierType, str]
         self.aggregated_group = ""
         self.underlying_symbol = ""
-        self.underlying_security_type = SecurityType.UNSPECIFIED
+        self.underlying_security_type = SecurityType.Unspecified
         self.market_rule_ids = ""
         self.real_expiration_date = ""
         self.underlying_component = None  # type: UnderlyingComponent
@@ -178,7 +179,7 @@ class Instrument(protocol.Serializable):
         self.right = message.read(str)
         self.multiplier = message.read(int)
         self.exchange = message.read(str)
-        if message.message_type not in (Incoming.OPEN_ORDER, Incoming.CONTRACT_DATA):
+        if message.message_type not in (Incoming.OPEN_ORDER, Incoming.CONTRACT_DATA, Incoming.EXECUTION_DATA):
             self.primary_exchange = message.read(str)
         self.currency = message.read(str)
         self.local_symbol = message.read(str)
@@ -369,3 +370,7 @@ class Instrument(protocol.Serializable):
         from .functionality.tickbytick import TickByTickMixin
         parent = typing.cast(TickByTickMixin, self._parent)
         parent.unsubscribe_tick_by_tick(self, 'Midpoint')
+
+    # --- Executions ---
+
+    on_execution = Event()  # type: Event[execution.Execution]

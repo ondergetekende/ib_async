@@ -47,7 +47,7 @@ class IncomingMessage:
         if self.protocol_version < messages_with_version.get(self.message_type, 0):
             self.message_version = self.read(int)
         else:
-            self.message_version = 0
+            self.message_version = int(self.protocol_version)
 
     def invoke_handler(self, handler: typing.Callable) -> typing.Any:
         signature = inspect.signature(handler)
