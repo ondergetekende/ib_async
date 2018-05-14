@@ -9,10 +9,10 @@ from ib_async.protocol_versions import ProtocolVersion
 LOG = logging.getLogger(__name__)
 
 
-class ContractDetailsMixin(ProtocolInterface):
+class InstrumentDetailsMixin(ProtocolInterface):
     def __init__(self):
         super().__init__()
-        self._pending_contract_updates = {}  # type: typing.Dict[RequestId, Instrument]
+        self._pending_instrument_updates = {}  # type: typing.Dict[RequestId, Instrument]
 
     def refresh_instrument(self, instrument: Instrument, include_expired=False) -> typing.Awaitable[Instrument]:
         request_id, future = self.make_future()
@@ -25,7 +25,7 @@ class ContractDetailsMixin(ProtocolInterface):
         self.send_message(Outgoing.REQ_CONTRACT_DATA, 8, request_id,
                           instrument,
                           include_expired, security_id_type, security_id)
-        self._pending_contract_updates[request_id] = instrument
+        self._pending_instrument_updates[request_id] = instrument
 
         return future
 
@@ -82,12 +82,12 @@ class ContractDetailsMixin(ProtocolInterface):
         # fast forward to instrument id position, so that we avoid making new contracts when existing ones can be
         # reused. This is required for proper event routing elsewhere
 
-        instrument = self._pending_contract_updates.get(request_id)
+        instrument = self._pending_instrument_updates.get(request_id)
 
         if not instrument:
             message.idx += 10
             instrument = Instrument.get_instance_from(message)
-            self._pending_contract_updates[request_id] = instrument
+            self._pending_instrument_updates[request_id] = instrument
             message.idx -= 10
 
         instrument.symbol = message.read(str)
@@ -131,6 +131,8 @@ class ContractDetailsMixin(ProtocolInterface):
         instrument.market_rule_ids = message.read(str, min_version=ProtocolVersion.MARKET_RULES)
         instrument.real_expiration_date = message.read(str, min_version=ProtocolVersion.REAL_EXPIRATION_DATE)
 
+        self.resolve_future(request_id, instrument)
+
     def _handle_contract_data_end(self, request_id: RequestId):
-        contract = self._pending_contract_updates.get(request_id)
-        self.resolve_future(request_id, contract)
+        # If the future has not already been resolved, nothing has been found.
+        self.resolve_future(request_id, None)

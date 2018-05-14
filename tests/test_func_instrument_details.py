@@ -1,10 +1,10 @@
-from ib_async.functionality.instrument_details import ContractDetailsMixin
+from ib_async.functionality.instrument_details import InstrumentDetailsMixin
 from ib_async.instrument import SecurityIdentifierType, Instrument
 
 from .utils import FunctionalityTestHelper
 
 
-class MixinFixture(ContractDetailsMixin, FunctionalityTestHelper):
+class MixinFixture(InstrumentDetailsMixin, FunctionalityTestHelper):
     pass
 
 
@@ -25,10 +25,8 @@ def test_by_isin():
                         '20180507:0700-20180507:1600;20180508:0700-20180508:1600;20180610:CLOSED',
                         '20180507:0700-20180507:1600;20180508:0700-20180508:1600;20180512:CLOSED', '', '', {}, '1', '',
                         '', '26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26', ''])
-    assert not fut.done()
-
-    t.dispatch_message(["52", "1", "43"]),  # CONTRACT_DATA_END
     assert fut.done()
+
     instrument = fut.result()
     assert instrument.symbol == 'AAPL'
     assert instrument.exchange == 'NYSE'
@@ -51,8 +49,7 @@ def test_by_local_symbol():
                         '20180507:0700-20180507:1600;20180508:0700-20180508:1600;20180610:CLOSED',
                         '20180507:0700-20180507:1600;20180508:0700-20180508:1600;20180512:CLOSED', '', '', {}, '1', '',
                         '', '26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26', ''])
-    assert not fut.done()
-    t.dispatch_message(["52", "1", "43"])  # CONTRACT_DATA_END
+
     assert fut.done()
     instrument = fut.result()
     assert instrument.symbol == 'AAPL'
@@ -80,10 +77,24 @@ def test_update_details():
                         '20180507:0700-20180507:1600;20180508:0700-20180508:1600;20180610:CLOSED',
                         '20180507:0700-20180507:1600;20180508:0700-20180508:1600;20180512:CLOSED', '', '', {}, '1', '',
                         '', '26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26,26', ''])
-    assert not fut.done()
+    assert fut.done()
     assert instrument.symbol == 'AAPL'
     assert instrument.exchange == 'NYSE'
 
+
+def test_update_details_noresult():
+    t = MixinFixture()
+    t.version = 110
+
+    instrument = Instrument(t)
+    instrument.symbol = 'AAPL'
+    instrument.security_ids = {SecurityIdentifierType.ISIN: 'US0378331005'}
+
+    fut = t.refresh_instrument(instrument)
+    assert not fut.done()
+    t.assert_one_message_sent(9, 8, 43, 0, 'AAPL', '', '', 0.0, '', '', '', '', '', '', '', False,
+                              'ISIN', 'US0378331005')
+
     t.dispatch_message(["52", "1", "43"]),  # CONTRACT_DATA_END
     assert fut.done()
-    assert fut.result() is instrument
+    assert fut.result() is None
