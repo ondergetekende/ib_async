@@ -4,7 +4,7 @@ import typing  # noqa
 
 from ib_async.errors import UnsupportedFeature
 from ib_async.event import Event
-from ib_async.execution import Execution
+from ib_async.execution import Execution, CommissionReport
 from ib_async.instrument import Instrument, SecurityType
 from ib_async.messages import Outgoing
 from ib_async.protocol import ProtocolInterface, IncomingMessage, ProtocolVersion, RequestId
@@ -69,3 +69,8 @@ class ExecutionsMixin(ProtocolInterface):
     def _handle_execution_data_end(self, request_id: RequestId):
         self.resolve_future(request_id,
                             self.__pending_execs.get(request_id) or [])
+
+    on_commission_report = Event()  # type: Event[CommissionReport]
+
+    def _handle_commission_report(self, commission_report: CommissionReport):
+        self.on_commission_report(commission_report)

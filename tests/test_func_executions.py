@@ -36,7 +36,7 @@ def test_get_executions():
                          'BOT', 1, '188.46', 2037003807, 0, 0, 1, '188.46', '', '', '', '', 2)
     assert not fut.done()
 
-    assert ord_exec .call_count == 1
+    assert ord_exec.call_count == 1
     assert cli_exec.call_count == 1
     assert inst_exec.call_count == 1
 
@@ -56,3 +56,16 @@ def test_executions_unsolicited():
                          'BOT', 1, '188.46', 2037003807, 0, 0, 1, '188.46', '', '', '', '', 2)
 
     assert cli_exec.call_count == 1
+
+
+def test_commission_report():
+    client = MixinFixture()
+    client.version = ProtocolVersion.MIFID_EXECUTION
+
+    client.on_commission_report = comm_rept = MagicMock()
+
+    client.fake_incoming(Incoming.COMMISSION_REPORT, 1, '0001b266.5af90b56.01.01', 10.0, 'USD',
+                         1.7976931348623157E308, 1.7976931348623157E308, '')
+
+    assert comm_rept.call_count == 1
+    assert comm_rept.mock_calls[0]
