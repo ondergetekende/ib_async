@@ -32,29 +32,29 @@ class ExecutionsMixin(ProtocolInterface):
         self.__pending_execs[request_id] = []
         return future
 
-    def _handle_execution_data(self, request_id: RequestId, order_id: int, msg: IncomingMessage):
-        if msg.message_version <= 10:
+    def _handle_execution_data(self, request_id: RequestId, order_id: int, message: IncomingMessage):
+        if message.message_version <= 10:
             raise UnsupportedFeature("execution details before version v10")
 
-        execution = Execution(self, msg.read(Instrument))
+        execution = Execution(self, message.read(Instrument))
         execution.order_id = order_id
-        execution.execution_id = msg.read()
-        execution.time = msg.read()
-        execution.account_number = msg.read()
-        execution.exchange = msg.read()
-        execution.side = msg.read()
-        execution.share = msg.read(float)
-        execution.price = msg.read(float)
-        execution.perm_id = msg.read(int)
-        execution.client_id = msg.read(int)
-        execution.liquidation = msg.read(int)
-        execution.cumulative_quantity = msg.read(float)
-        execution.average_price = msg.read(float)
-        execution.order_ref = msg.read()
-        execution.ev_rule = msg.read()
-        execution.ev_multiplier = msg.read(float)
-        execution.model_code = msg.read(min_version=ProtocolVersion.MODELS_SUPPORT)
-        execution.last_liquidity = msg.read(int, min_version=ProtocolVersion.LAST_LIQUIDITY)
+        execution.execution_id = message.read()
+        execution.time = message.read()
+        execution.account_number = message.read()
+        execution.exchange = message.read()
+        execution.side = message.read()
+        execution.share = message.read(float)
+        execution.price = message.read(float)
+        execution.perm_id = message.read(int)
+        execution.client_id = message.read(int)
+        execution.liquidation = message.read(int)
+        execution.cumulative_quantity = message.read(float)
+        execution.average_price = message.read(float)
+        execution.order_ref = message.read()
+        execution.ev_rule = message.read()
+        execution.ev_multiplier = message.read(float)
+        execution.model_code = message.read(min_version=ProtocolVersion.MODELS_SUPPORT)
+        execution.last_liquidity = message.read(int, min_version=ProtocolVersion.LAST_LIQUIDITY)
 
         execs = self.__pending_execs.get(request_id)
         if execs is not None:

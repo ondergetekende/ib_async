@@ -388,9 +388,7 @@ class Protocol(ProtocolInterface):
         message = IncomingMessage(fields, source=self)
 
         # Find a general-purpose handler
-        handler = (getattr(self, "_handle_%s" % message.message_type.name.lower(), None) or
-                   getattr(self, "_handle_%s_v%i" % (message.message_type.name.lower(), message.message_version),
-                           None))
+        handler = getattr(self, "_handle_%s" % message.message_type.name.lower(), None)
 
         if handler:
             try:

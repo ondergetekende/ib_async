@@ -209,40 +209,33 @@ def test_protocol_check_feature():
     assert str(e.value) == "The TWS is out of date and must be upgraded."
 
 
-def test_protocol_check_dispatch(caplog):
-    protocol = Protocol()
-    is_called_arg = None
+def test_protocol_check_dispatch():
+    was_called = False
 
-    def mocked(arg: int):
-        nonlocal is_called_arg
-        is_called_arg = arg
+    class MockProtocol(Protocol):
+        def _handle_tick_size(self, val: int):
+            nonlocal was_called
+            assert not was_called
+            was_called = True
 
-    protocol._handle_tick_size = mocked
+    protocol = MockProtocol()
     protocol.version = ProtocolVersion.MIN_CLIENT
     protocol.dispatch_message(["2", "10", "42"])
 
-    assert is_called_arg == 42
+    assert was_called
+
+
+def test_protocol_check_dispatch_nohandler(caplog):
+    protocol = Protocol()
+
+    protocol.version = ProtocolVersion.MIN_CLIENT
+    protocol.dispatch_message(["2", "10", "42"])
 
     assert caplog.records == []
 
     with caplog.at_level('DEBUG'):
-        del protocol._handle_tick_size
         protocol.dispatch_message(["2", "10", "42"])
-        assert len(caplog.records) == 1
-        assert caplog.records[0].message == ("no handler for IncomingMessage(Incoming.TICK_SIZE, 10, "
-                                             "'42', protocol_version=ProtocolVersion.MIN_CLIENT) (v10)")
 
-
-def test_protocol_check_dispatch_versioned():
-    protocol = Protocol()
-    is_called_arg = None
-
-    def mocked(arg: int):
-        nonlocal is_called_arg
-        is_called_arg = arg
-
-    protocol.version = ProtocolVersion.MIN_CLIENT
-    protocol._handle_tick_size_v10 = mocked
-    protocol.dispatch_message(["2", "10", "42"])
-
-    assert is_called_arg == 42
+    assert len(caplog.records) == 1
+    assert caplog.records[0].message == ("no handler for IncomingMessage(Incoming.TICK_SIZE, 10, "
+                                         "'42', protocol_version=ProtocolVersion.MIN_CLIENT) (v10)")

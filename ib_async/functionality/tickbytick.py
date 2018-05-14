@@ -34,7 +34,7 @@ class TickByTickMixin(ProtocolInterface):
             del self.__instruments[request_id]
             self.send_message(Outgoing.CANCEL_TICK_BY_TICK_DATA, request_id)
 
-    def _handle_tick_by_tick(self, request_id: RequestId, tick_type: int, time: int, msg: IncomingMessage):
+    def _handle_tick_by_tick(self, request_id: RequestId, tick_type: int, time: int, message: IncomingMessage):
         entry = self.__instruments.get(request_id)
         if not entry:
             return
@@ -42,14 +42,14 @@ class TickByTickMixin(ProtocolInterface):
         instrument = entry[1]
 
         if tick_type in (1, 2):
-            price = msg.read(float)
-            size = msg.read(int)
-            attributes = msg.read(int)
+            price = message.read(float)
+            size = message.read(int)
+            attributes = message.read(int)
             past_limit = bool(attributes & 0x01)
             unreported = bool(attributes & 0x02)
 
-            exchange = msg.read(str)
-            special_conditions = msg.read(str)
+            exchange = message.read(str)
+            special_conditions = message.read(str)
 
             tick = LastTick(time, price, size, past_limit, unreported, exchange, special_conditions)
             if tick_type == 1:
@@ -57,11 +57,11 @@ class TickByTickMixin(ProtocolInterface):
             else:
                 instrument.on_tick_by_tick_all(tick)
         elif tick_type == 3:
-            bid_price = msg.read(float)
-            ask_price = msg.read(float)
-            bid_size = msg.read(int)
-            ask_size = msg.read(int)
-            attributes = msg.read(int)
+            bid_price = message.read(float)
+            ask_price = message.read(float)
+            bid_size = message.read(int)
+            ask_size = message.read(int)
+            attributes = message.read(int)
 
             bid_past_low = bool(attributes & 0x01)
             ask_past_high = bool(attributes & 0x02)
@@ -70,5 +70,5 @@ class TickByTickMixin(ProtocolInterface):
             instrument.on_tick_by_tick_bidask(bidask_tick)
         else:
             assert tick_type == 4
-            mid_point = msg.read(float)
+            mid_point = message.read(float)
             instrument.on_tick_by_tick_midpoint(MidpointTick(time, mid_point))
