@@ -2,7 +2,7 @@ import asyncio
 import logging
 import typing
 
-from ib_async.bar import Bar, HistoricBar, BarType
+from ib_async.bar import Bar, BarType
 from ib_async.errors import UnsupportedFeature
 from ib_async.instrument import Instrument
 from ib_async.messages import Outgoing
@@ -115,5 +115,5 @@ class RealtimeBarsMixin(ProtocolInterface):
 
     def _handle_historical_data(self, request_id: RequestId,
                                 start_date: str, end_date: str,
-                                bars: typing.List[HistoricBar]):
+                                bars: typing.List[Bar]):
         self.resolve_future(request_id, bars)

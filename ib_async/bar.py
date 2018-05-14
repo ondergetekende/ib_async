@@ -1,3 +1,4 @@
+import datetime
 import enum
 import logging
 
@@ -31,24 +32,14 @@ class Bar(protocol.Serializable):
         self.count = None  # type: int
         self.has_gaps = ""
 
-    def serialize(self, message: protocol.OutgoingMessage, *, serializing_historic=False):
-        message.add(
-            self.time,
-            self.open,
-            self.high,
-            self.low,
-            self.close,
-            self.volume,
-            self.average,
-        )
+    @property
+    def datetime(self):
+        return datetime.datetime.utcfromtimestamp(self.time)
 
-        if serializing_historic:
-            message.add(self.has_gaps,
-                        max_version=protocol.ProtocolVersion.SYNT_REALTIME_BARS)
+    def serialize(self, message: protocol.OutgoingMessage):
+        raise NotImplementedError()
 
-        message.add(self.count)
-
-    def deserialize(self, message: protocol.IncomingMessage, *, deserializing_historic=False):
+    def deserialize(self, message: protocol.IncomingMessage):
         self.time = message.read(int)
         self.open = message.read(float)
         self.high = message.read(float)
@@ -56,14 +47,9 @@ class Bar(protocol.Serializable):
         self.close = message.read(float)
         self.volume = message.read(int)
         self.average = message.read(float)
-        if deserializing_historic:
+        if message.message_type == protocol.Incoming.HISTORICAL_DATA:
             self.has_gaps = message.read(str, max_version=protocol.ProtocolVersion.SYNT_REALTIME_BARS)
         self.count = message.read(int)
 
-
-class HistoricBar(Bar):
-    def serialize(self, message: protocol.OutgoingMessage, *, serializing_historic=True):
-        return super().serialize(message, serializing_historic=True)
-
-    def deserialize(self, message: protocol.IncomingMessage, *, deserializing_historic=True):
-        return super().deserialize(message, deserializing_historic=True)
+    def __str__(self):
+        return "%s: close %.2f" % (self.datetime, self.close)
