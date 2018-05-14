@@ -1,4 +1,5 @@
 import asyncio  # noqa
+import datetime
 import logging
 import typing  # noqa
 
@@ -39,7 +40,7 @@ class ExecutionsMixin(ProtocolInterface):
         execution = Execution(self, message.read(Instrument))
         execution.order_id = order_id
         execution.execution_id = message.read()
-        execution.time = message.read()
+        execution.time = message.read(datetime.datetime)
         execution.account_number = message.read()
         execution.exchange = message.read()
         execution.side = message.read()

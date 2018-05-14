@@ -1,3 +1,4 @@
+import datetime
 import enum
 import logging
 import typing
@@ -79,7 +80,7 @@ class Instrument(protocol.Serializable):
 
         self.symbol = ""
         self.security_type = SecurityType.Unspecified
-        self.last_trade_date = ""
+        self.last_trade_date = None  # type: datetime.datetime
         self.strike = 0.0
         self.right = ""
         self.exchange = ""

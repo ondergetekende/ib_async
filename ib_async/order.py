@@ -140,8 +140,9 @@ class Order(Serializable):
         # extended order fields
         self.time_in_force = TimeInForce.GoodTillCancel
 
-        self.active_start_time = ""  # for GTC orders.
-        self.active_stop_time = ""  # for GTC orders.
+        # for GTC orders.
+        self.active_start_time = None  # type: datetime.datetime
+        self.active_stop_time = None  # type: datetime.datetime
 
         self.oca_group = ""
         self.oca_type = 0
@@ -154,8 +155,8 @@ class Order(Serializable):
         self.trigger_method = 0
         self.outside_regular_trading_hours = False
         self.hidden = False
-        self.good_after_time = ""
-        self.good_till_date = ""
+        self.good_after_time = None  # type: datetime.datetime
+        self.good_till_date = None  # type: datetime.datetime
         self.rule80a = ""
 
         self.all_or_none = False

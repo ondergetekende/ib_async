@@ -1,3 +1,4 @@
+import datetime
 import logging
 import typing
 
@@ -92,7 +93,7 @@ class InstrumentDetailsMixin(ProtocolInterface):
 
         instrument.symbol = message.read(str)
         instrument.security_type = message.read(SecurityType)
-        instrument.last_trade_date = message.read(str)
+        instrument.last_trade_date = message.read(datetime.datetime)
         instrument.strike = message.read(float)
         instrument.right = message.read(str)
         instrument.exchange = message.read(str)
@@ -129,7 +130,7 @@ class InstrumentDetailsMixin(ProtocolInterface):
         instrument.underlying_security_type = message.read(SecurityType, min_version=ProtocolVersion.UNDERLYING_INFO)
 
         instrument.market_rule_ids = message.read(str, min_version=ProtocolVersion.MARKET_RULES)
-        instrument.real_expiration_date = message.read(str, min_version=ProtocolVersion.REAL_EXPIRATION_DATE)
+        instrument.real_expiration_date = message.read(datetime.datetime, min_version=ProtocolVersion.REAL_EXPIRATION_DATE)
 
         self.resolve_future(request_id, instrument)
 

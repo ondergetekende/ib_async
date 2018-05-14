@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 import typing
 
@@ -161,7 +162,7 @@ class OrdersMixin(ProtocolInterface):
         order.fa_profile = fa_profile
 
         order.model_code = message.read(min_version=ProtocolVersion.MODELS_SUPPORT)
-        order.good_till_date = message.read()
+        order.good_till_date = message.read(datetime.datetime)
         order.rule80a = message.read()
         order.percent_offset = message.read(float)
         order.settling_firm = message.read()

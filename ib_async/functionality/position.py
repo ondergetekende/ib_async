@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 import logging
 import typing
 
@@ -70,7 +71,7 @@ class PositionMixin(ProtocolInterface):
         instrument.contract_id = message.read(int)
         instrument.symbol = message.read(str)
         instrument.security_type = message.read(str)
-        instrument.last_trade_date = instrument.contract_month = message.read(str)
+        instrument.last_trade_date = instrument.contract_month = message.read(datetime.date)
         instrument.strike = message.read(float)
         instrument.right = message.read(str)
         instrument.multiplier = message.read(int)

@@ -1,5 +1,6 @@
 import abc
 import asyncio
+import datetime
 import enum
 import inspect
 import logging
@@ -153,6 +154,12 @@ class IncomingMessage:
                 pass
             return text  # type: ignore
 
+        if issubclass(the_type, datetime.datetime):
+            return the_type.strptime(text, "%Y%m%d  %H:%M:%S")  # type: ignore
+
+        if issubclass(the_type, datetime.date):
+            return datetime.datetime.strptime(text, "%Y%m%d").date()  # type: ignore
+
         if issubclass(the_type, int):
             result = the_type(text)
             return None if result >= 2147483647 else result  # type: ignore
@@ -230,6 +237,15 @@ class OutgoingMessage:
             self.fields_encoded.append(b"1" if field else b'0')
         elif isinstance(field, (float, int)):
             self.fields_encoded.append(str(field).encode())
+        elif isinstance(field, datetime.datetime):
+            # 20180201 10:00:00 GMT
+            if field.tzinfo:
+                field = field.strftime("%Y%m%d  %H:%M:%S %Z")
+            else:
+                field = field.strftime("%Y%m%d  %H:%M:%S")
+            self.fields_encoded.append(str(field).encode())
+        elif isinstance(field, datetime.date):
+            self.fields_encoded.append(field.strftime("%Y%m%d").encode())
         elif isinstance(field, dict):
             self._add_field(len(field), field)
             for key, value in field.items():

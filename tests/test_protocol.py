@@ -1,4 +1,5 @@
 import enum
+import datetime
 from unittest import mock
 import typing
 import sys
@@ -38,6 +39,8 @@ def test_message_read():
     assert mk_message_read(str, "2") == "2"
     assert mk_message_read(bool, "2") is True
     assert mk_message_read(bool, "0") is False
+    assert mk_message_read(datetime.datetime, "20180511  19:17:00") == datetime.datetime(2018, 5, 11, 19, 17)
+    assert mk_message_read(datetime.date, "20180511") == datetime.date(2018, 5, 11)
     assert mk_message_read(list, "2", 'A', 'B') == ['A', 'B']
     assert mk_message_read(typing.List[int], "2", '1', '2') == [1, 2]
     assert mk_message_read(dict, "2", 'A', 'B', 'B', 'C') == {'A': 'B', 'B': 'C'}
@@ -132,6 +135,8 @@ def test_outgoing_serialize():
     assert _serialize(True) == b'1'
     assert _serialize(False) == b'0'
     assert _serialize([""]) == b'1\0'
+    assert _serialize(datetime.datetime(2005, 1, 1, 18, 0, 0)) == b'20050101  18:00:00'
+    assert _serialize(datetime.date(2005, 1, 1)) == b'20050101'
     assert _serialize({'a': 1}) == b'1\0a\x001'
     assert _serialize(ProtocolVersion(112)) == b'112'
     assert _serialize(None) == b''
